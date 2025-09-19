@@ -338,34 +338,41 @@ class DatabaseManager:
             
             # Article counts
             cursor.execute('SELECT COUNT(*) FROM articles')
-            stats['total_articles'] = cursor.fetchone()[0]
+            result = cursor.fetchone()
+            stats['total_articles'] = result[0] if result else 0
             
             cursor.execute('SELECT COUNT(*) FROM articles WHERE is_human_targeted = 1')
-            stats['human_targeted_articles'] = cursor.fetchone()[0]
+            result = cursor.fetchone()
+            stats['human_targeted_articles'] = result[0] if result else 0
             
             cursor.execute('SELECT COUNT(*) FROM articles WHERE is_human_targeted = 0')
-            stats['general_articles'] = cursor.fetchone()[0]
+            result = cursor.fetchone()
+            stats['general_articles'] = result[0] if result else 0
             
             # Date range
             cursor.execute('SELECT MIN(published_date), MAX(published_date) FROM articles')
             date_range = cursor.fetchone()
             stats['date_range'] = {
-                'start': date_range[0],
-                'end': date_range[1]
+                'start': date_range[0] if date_range and date_range[0] else None,
+                'end': date_range[1] if date_range and date_range[1] else None
             }
             
             # Unique counts
             cursor.execute('SELECT COUNT(DISTINCT source) FROM articles')
-            stats['unique_sources'] = cursor.fetchone()[0]
+            result = cursor.fetchone()
+            stats['unique_sources'] = result[0] if result else 0
             
             cursor.execute('SELECT COUNT(DISTINCT threat_actor) FROM articles WHERE threat_actor IS NOT NULL AND threat_actor != ""')
-            stats['unique_threat_actors'] = cursor.fetchone()[0]
+            result = cursor.fetchone()
+            stats['unique_threat_actors'] = result[0] if result else 0
             
             cursor.execute('SELECT COUNT(DISTINCT ttp) FROM ttps')
-            stats['unique_ttps'] = cursor.fetchone()[0]
+            result = cursor.fetchone()
+            stats['unique_ttps'] = result[0] if result else 0
             
             cursor.execute('SELECT COUNT(DISTINCT country) FROM countries')
-            stats['unique_countries'] = cursor.fetchone()[0]
+            result = cursor.fetchone()
+            stats['unique_countries'] = result[0] if result else 0
             
             # Top sources
             cursor.execute('''
@@ -376,4 +383,204 @@ class DatabaseManager:
                 ORDER BY count DESC 
                 LIMIT 10
             ''')
-            stats['top_sources'] = dict(cursor.fetch
+            results = cursor.fetchall()
+            stats['top_sources'] = dict(results) if results else {}
+            
+            # Top TTPs
+            cursor.execute('''
+                SELECT ttp, COUNT(*) as count 
+                FROM ttps 
+                GROUP BY ttp 
+                ORDER BY count DESC 
+                LIMIT 10
+            ''')
+            results = cursor.fetchall()
+            stats['top_ttps'] = dict(results) if results else {}
+            
+            # Top countries
+            cursor.execute('''
+                SELECT country, COUNT(*) as count 
+                FROM countries 
+                GROUP BY country 
+                ORDER BY count DESC 
+                LIMIT 10
+            ''')
+            results = cursor.fetchall()
+            stats['top_countries'] = dict(results) if results else {}
+            
+            # Recent activity (last 7 days)
+            cursor.execute('''
+                SELECT COUNT(*) FROM articles 
+                WHERE published_date >= datetime('now', '-7 days')
+            ''')
+            result = cursor.fetchone()
+            stats['recent_activity'] = result[0] if result else 0
+            
+            conn.close()
+            return stats
+            
+        except Exception as e:
+            logger.error(f"Error getting database statistics: {e}")
+            return {}
+    
+    def backup_database(self, backup_path: Optional[str] = None) -> bool:
+        """
+        Create a backup of the database
+        
+        Args:
+            backup_path: Optional path for backup file
+            
+        Returns:
+            True if successful, False otherwise
+        """
+        try:
+            if not backup_path:
+                timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
+                backup_path = f"threat_intel_backup_{timestamp}.db"
+            
+            # Create backup directory if needed
+            backup_file = Path(backup_path)
+            backup_file.parent.mkdir(parents=True, exist_ok=True)
+            
+            # Copy database file
+            import shutil
+            shutil.copy2(self.db_path, backup_file)
+            
+            logger.info(f"Database backed up to: {backup_file}")
+            return True
+            
+        except Exception as e:
+            logger.error(f"Error creating database backup: {e}")
+            return False
+    
+    def vacuum_database(self) -> bool:
+        """
+        Vacuum the database to reclaim space and optimize performance
+        
+        Returns:
+            True if successful, False otherwise
+        """
+        try:
+            conn = self.get_connection()
+            cursor = conn.cursor()
+            
+            cursor.execute('VACUUM')
+            cursor.execute('ANALYZE')
+            
+            conn.commit()
+            conn.close()
+            
+            logger.info("Database vacuum completed successfully")
+            return True
+            
+        except Exception as e:
+            logger.error(f"Error vacuuming database: {e}")
+            return False
+    
+    def delete_old_articles(self, days_old: int = 365) -> int:
+        """
+        Delete articles older than specified days
+        
+        Args:
+            days_old: Delete articles older than this many days
+            
+        Returns:
+            Number of articles deleted
+        """
+        try:
+            conn = self.get_connection()
+            cursor = conn.cursor()
+            
+            cutoff_date = datetime.now() - timedelta(days=days_old)
+            
+            cursor.execute('''
+                DELETE FROM articles 
+                WHERE published_date < ?
+            ''', (cutoff_date,))
+            
+            deleted_count = cursor.rowcount
+            conn.commit()
+            conn.close()
+            
+            logger.info(f"Deleted {deleted_count} old articles")
+            return deleted_count
+            
+        except Exception as e:
+            logger.error(f"Error deleting old articles: {e}")
+            return 0
+    
+    def get_article_by_url(self, url: str) -> Optional[Dict[str, Any]]:
+        """
+        Get a specific article by URL
+        
+        Args:
+            url: Article URL
+            
+        Returns:
+            Article data or None if not found
+        """
+        try:
+            conn = self.get_connection()
+            cursor = conn.cursor()
+            
+            cursor.execute('''
+                SELECT a.*, 
+                       GROUP_CONCAT(DISTINCT t.ttp) as ttps,
+                       GROUP_CONCAT(DISTINCT c.country) as countries
+                FROM articles a
+                LEFT JOIN ttps t ON a.id = t.article_id
+                LEFT JOIN countries c ON a.id = c.article_id
+                WHERE a.url = ?
+                GROUP BY a.id
+            ''', (url,))
+            
+            result = cursor.fetchone()
+            conn.close()
+            
+            if result:
+                return dict(result)
+            return None
+            
+        except Exception as e:
+            logger.error(f"Error getting article by URL: {e}")
+            return None
+    
+    def update_article_severity(self, article_id: int, severity: str) -> bool:
+        """
+        Update article severity
+        
+        Args:
+            article_id: Article ID
+            severity: New severity level
+            
+        Returns:
+            True if successful, False otherwise
+        """
+        try:
+            conn = self.get_connection()
+            cursor = conn.cursor()
+            
+            cursor.execute('''
+                UPDATE articles 
+                SET severity = ?, updated_at = CURRENT_TIMESTAMP
+                WHERE id = ?
+            ''', (severity, article_id))
+            
+            success = cursor.rowcount > 0
+            conn.commit()
+            conn.close()
+            
+            return success
+            
+        except Exception as e:
+            logger.error(f"Error updating article severity: {e}")
+            return False
+    
+    def close(self):
+        """Close database connection"""
+        # No persistent connection to close in this implementation
+        pass
+    
+    def __del__(self):
+        """Cleanup on deletion"""
+        self.close()
