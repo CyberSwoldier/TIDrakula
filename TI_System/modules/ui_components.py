@@ -418,45 +418,45 @@ class UIComponents:
         )
         return fig
     
-def create_professional_table_heatmap(self, data: pd.DataFrame, x_col: str, y_col: str, value_col: str):
-    """
-    Minimalistic table-like heatmap:
-    - No colors on cells
-    - Grid lines visible
-    - Numbers displayed with spacing
-    - Zeros hidden
-    """
-    pivot_data = data.pivot(index=y_col, columns=x_col, values=value_col).fillna(0)
-
-    # Replace zeros with empty string for text
-    text_values = pivot_data.values.astype(int).astype(str)
-    text_values[pivot_data.values == 0] = ""
-
-    # Create heatmap with transparent colors
-    fig = go.Figure(go.Heatmap(
-        z=np.zeros_like(pivot_data.values),  # all zero: no color
-        x=list(pivot_data.columns),
-        y=list(pivot_data.index),
-        text=text_values,
-        texttemplate="%{text}",
-        textfont=dict(size=16, color="white", family='Inter'),
-        colorscale=[[0, "rgba(0,0,0,0)"], [1, "rgba(0,0,0,0)"]],  # fully transparent
-        showscale=False,
-        xgap=2,  # space between columns
-        ygap=2,  # space between rows
-        hovertemplate=f'{x_col}: %{{x}}<br>{y_col}: %{{y}}<br>Count: %{{text}}<extra></extra>'
-    ))
-
-    fig.update_layout(
-        paper_bgcolor='rgba(0,0,0,0)',
-        plot_bgcolor='rgba(0,0,0,0)',
-        xaxis=dict(gridcolor='rgba(255,255,255,0.3)', zeroline=False, tickangle=-45),
-        yaxis=dict(gridcolor='rgba(255,255,255,0.3)', zeroline=False, autorange='reversed'),
-        margin=dict(t=20, b=80, l=150, r=20),
-        height=500
-    )
-
-    return fig
+    def create_professional_heatmap(self, data: pd.DataFrame, x_col: str, y_col: str, value_col: str):
+        """Heatmap with zeros hidden and light grid"""
+        pivot_data = data.pivot(index=y_col, columns=x_col, values=value_col).fillna(0)
+        z_values = pivot_data.values.astype(float)
+        z_values[z_values == 0] = np.nan  # hide zeros
+        text_values = pivot_data.values.astype(int).astype(str)
+        text_values[z_values != z_values] = ""
+        
+        fig = go.Figure(go.Heatmap(
+            z=z_values,
+            x=list(pivot_data.columns),
+            y=list(pivot_data.index),
+            colorscale=[
+                [0, '#1a1d23'],
+                [0.2, '#2a2d35'],
+                [0.4, '#3a3d45'],
+                [0.6, '#00a8cc'],
+                [0.8, '#00d4ff'],
+                [1, '#00ff88']
+            ],
+            text=text_values,
+            texttemplate="%{text}",
+            textfont=dict(size=10, color="white", family='Inter'),
+            showscale=False,
+            hovertemplate=f'{x_col}: %{{x}}<br>{y_col}: %{{y}}<br>Count: %{{z}}<extra></extra>',
+            xgap=1,
+            ygap=1
+        ))
+        
+        fig.update_layout(
+            paper_bgcolor='rgba(0,0,0,0)',
+            plot_bgcolor='rgba(0,0,0,0)',
+            font=dict(color='white'),
+            xaxis=dict(gridcolor='rgba(255,255,255,0.1)', tickangle=-45, zeroline=False),
+            yaxis=dict(gridcolor='rgba(255,255,255,0.1)', zeroline=False),
+            margin=dict(t=20, b=80, l=150, r=20),
+            height=500
+        )
+        return fig
     
     def create_trend_chart(self, data: pd.DataFrame, x_col: str, y_col: str, category_col: str):
         fig = go.Figure()
