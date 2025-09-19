@@ -1,0 +1,71 @@
+# ===========================
+# File: config.yaml
+# ===========================
+"""
+Configuration file for Threat Intelligence System
+"""
+# Database Configuration
+database:
+  path: "threat_intel.db"
+  backup_enabled: true
+  backup_path: "backups/"
+
+# OTX Configuration
+otx:
+  api_key: "YOUR_OTX_API_KEY_HERE"  # Get from https://otx.alienvault.com
+  enabled: true
+  pulse_limit: 100
+
+# GitHub Configuration
+github:
+  user: "CyberSwoldier"
+  repo: "Threat-Intelligence-NIMBLR"
+  branch: "main"
+  reports_folder: "reports"
+
+# Feed Sources
+feeds:
+  rss_feeds:
+    - "https://thecyberexpress.com/feed/"
+    - "https://cybersecuritynews.com/feed/"
+    - "https://dailycybersecuritynews.com/feed/"
+    - "https://thehackernews.com/feeds/posts/default?alt=rss"
+    - "https://www.bleepingcomputer.com/feed/"
+    - "https://krebsonsecurity.com/feed"
+    - "https://www.darkreading.com/rss.xml"
+    - "https://threatpost.com/feed"
+  
+  timeout: 20
+  user_agent: "ThreatIntel/2.0"
+
+# Collection Settings
+collection:
+  days_back: 7
+  auto_run: false
+  schedule: "0 0 * * FRI"  # Cron format - every Friday at midnight
+
+# GeoIP Configuration
+geoip:
+  database_path: "GeoLite2-Country.mmdb"
+  auto_update: true
+
+# Report Settings
+reports:
+  output_format: ["excel", "json", "csv"]
+  excel_filename_format: "ttp_reports_%d%m%y.xlsx"
+  include_content: false  # Include full article content in reports
+
+# Dashboard Settings
+dashboard:
+  page_title: "Weekly Threat Intelligence"
+  layout: "wide"
+  theme: "dark"
+  auto_refresh: false
+  refresh_interval: 3600  # seconds
+
+# Logging
+logging:
+  level: "INFO"
+  file: "threat_intel.log"
+  max_size: "10MB"
+  backup_count: 5
