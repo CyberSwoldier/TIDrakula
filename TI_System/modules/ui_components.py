@@ -1,12 +1,44 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Threat Intelligence Dashboard</title>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/plotly.js/2.26.0/plotly.min.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/date-fns/2.30.0/index.min.js"></script>
-    <style>
+#!/usr/bin/env python3
+"""
+Enhanced UI components module with professional styling for Streamlit
+File: modules/ui_components.py
+"""
+import streamlit as st
+import plotly.graph_objects as go
+import plotly.express as px
+import numpy as np
+import pandas as pd
+import pycountry
+from io import BytesIO
+
+class UIComponents:
+    """Enhanced UI components with professional styling"""
+    
+    def __init__(self):
+        """Initialize UI components with custom styling"""
+        self.setup_page_config()
+        self.inject_custom_css()
+    
+    def setup_page_config(self):
+        """Configure Streamlit page settings - only call once"""
+        try:
+            st.set_page_config(
+                page_title="🛡️ Threat Intelligence Dashboard",
+                page_icon="🛡️",
+                layout="wide",
+                initial_sidebar_state="expanded"
+            )
+        except:
+            pass  # Already configured
+    
+    def inject_custom_css(self):
+        """Inject custom CSS for professional styling"""
+        st.markdown("""
+        <style>
+        /* Import Google Fonts */
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap');
+        
+        /* Global Variables */
         :root {
             --primary-bg: #0a0b0f;
             --secondary-bg: #1a1d23;
@@ -18,99 +50,134 @@
             --text-primary: #ffffff;
             --text-secondary: #b0b3b8;
             --border-color: #3a3d45;
-            --shadow-dark: 0 8px 32px rgba(0, 0, 0, 0.4);
-            --shadow-glow: 0 0 20px rgba(0, 212, 255, 0.1);
         }
-
-        * {
-            margin: 0;
-            padding: 0;
-            box-sizing: border-box;
-        }
-
-        body {
-            font-family: 'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+        
+        /* Main App Styling */
+        .stApp {
             background: linear-gradient(135deg, var(--primary-bg) 0%, #0f1419 100%);
             color: var(--text-primary);
-            line-height: 1.6;
-            overflow-x: hidden;
+            font-family: 'Inter', sans-serif;
         }
-
-        .dashboard-container {
-            min-height: 100vh;
-            display: flex;
-            flex-direction: column;
+        
+        /* Header Styling */
+        .main-header {
+            background: linear-gradient(135deg, var(--secondary-bg), var(--tertiary-bg));
+            border: 1px solid var(--border-color);
+            border-radius: 16px;
+            padding: 2rem;
+            margin-bottom: 2rem;
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
         }
-
-        /* Header */
-        .header {
-            background: rgba(26, 29, 35, 0.95);
-            backdrop-filter: blur(20px);
-            border-bottom: 1px solid var(--border-color);
-            padding: 1rem 2rem;
-            position: sticky;
-            top: 0;
-            z-index: 100;
-            box-shadow: var(--shadow-dark);
-        }
-
-        .header-content {
-            max-width: 1400px;
-            margin: 0 auto;
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-        }
-
-        .logo {
-            font-size: 1.5rem;
-            font-weight: 700;
+        
+        .header-title {
+            font-size: 2.5rem;
+            font-weight: 800;
             background: linear-gradient(135deg, var(--accent-color), #00a8cc);
             -webkit-background-clip: text;
             -webkit-text-fill-color: transparent;
             background-clip: text;
+            margin-bottom: 0.5rem;
         }
-
-        .header-controls {
+        
+        .header-subtitle {
+            color: var(--text-secondary);
+            font-size: 1.1rem;
+            font-weight: 400;
+        }
+        
+        /* Metric Cards */
+        .metric-row {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 1.5rem;
+            margin: 2rem 0;
+        }
+        
+        .metric-card {
+            background: linear-gradient(135deg, var(--secondary-bg), var(--tertiary-bg));
+            border: 1px solid var(--border-color);
+            border-radius: 16px;
+            padding: 1.5rem;
+            text-align: center;
+            position: relative;
+            overflow: hidden;
+            transition: transform 0.3s ease, box-shadow 0.3s ease;
+        }
+        
+        .metric-card::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 4px;
+            background: linear-gradient(90deg, var(--accent-color), var(--success-color));
+        }
+        
+        .metric-card:hover {
+            transform: translateY(-4px);
+            box-shadow: 0 0 20px rgba(0, 212, 255, 0.2);
+        }
+        
+        .metric-value {
+            font-size: 3rem;
+            font-weight: 800;
+            color: var(--accent-color);
+            margin-bottom: 0.5rem;
+            line-height: 1;
+        }
+        
+        .metric-label {
+            color: var(--text-secondary);
+            font-size: 0.9rem;
+            font-weight: 600;
+            text-transform: uppercase;
+            letter-spacing: 0.5px;
+        }
+        
+        /* Chart Containers */
+        .chart-container {
+            background: var(--secondary-bg);
+            border: 1px solid var(--border-color);
+            border-radius: 16px;
+            padding: 1.5rem;
+            margin-bottom: 2rem;
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
+        }
+        
+        .chart-title {
+            font-size: 1.4rem;
+            font-weight: 700;
+            color: var(--text-primary);
+            margin-bottom: 1rem;
             display: flex;
-            gap: 1rem;
             align-items: center;
+            gap: 0.5rem;
         }
-
-        .time-selector {
+        
+        .chart-icon {
+            width: 24px;
+            height: 24px;
+            background: var(--accent-color);
+            border-radius: 6px;
+            display: inline-block;
+        }
+        
+        /* Sidebar Styling */
+        .css-1d391kg {
+            background: var(--secondary-bg);
+            border-right: 1px solid var(--border-color);
+        }
+        
+        /* Filter Styling */
+        .filter-container {
             background: var(--tertiary-bg);
             border: 1px solid var(--border-color);
-            color: var(--text-primary);
-            padding: 0.5rem 1rem;
-            border-radius: 8px;
-            font-size: 0.9rem;
+            border-radius: 12px;
+            padding: 1.5rem;
+            margin: 1rem 0;
         }
-
-        .refresh-btn {
-            background: linear-gradient(135deg, var(--accent-color), #00a8cc);
-            border: none;
-            color: white;
-            padding: 0.5rem 1rem;
-            border-radius: 8px;
-            cursor: pointer;
-            font-weight: 600;
-            transition: all 0.3s ease;
-        }
-
-        .refresh-btn:hover {
-            transform: translateY(-2px);
-            box-shadow: 0 8px 25px rgba(0, 212, 255, 0.3);
-        }
-
-        /* Main Content */
-        .main-content {
-            flex: 1;
-            padding: 2rem;
-            max-width: 1400px;
-            margin: 0 auto;
-            width: 100%;
-        }
-
+        
         /* Executive Summary */
         .executive-summary {
             background: linear-gradient(135deg, var(--secondary-bg), var(--tertiary-bg));
@@ -118,181 +185,66 @@
             border-radius: 16px;
             padding: 2rem;
             margin-bottom: 2rem;
-            box-shadow: var(--shadow-dark);
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
         }
-
+        
         .summary-title {
             font-size: 1.8rem;
             font-weight: 700;
+            color: var(--accent-color);
             margin-bottom: 1rem;
-            color: var(--accent-color);
         }
-
-        .summary-content {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-            gap: 1.5rem;
-            margin-top: 1.5rem;
-        }
-
-        .metric-card {
-            background: rgba(42, 45, 53, 0.6);
-            border: 1px solid var(--border-color);
-            border-radius: 12px;
-            padding: 1.5rem;
-            text-align: center;
-            transition: all 0.3s ease;
-            position: relative;
-            overflow: hidden;
-        }
-
-        .metric-card::before {
-            content: '';
-            position: absolute;
-            top: 0;
-            left: 0;
-            right: 0;
-            height: 3px;
-            background: linear-gradient(90deg, var(--accent-color), var(--success-color));
-        }
-
-        .metric-card:hover {
-            transform: translateY(-4px);
-            box-shadow: var(--shadow-glow);
-        }
-
-        .metric-value {
-            font-size: 2.5rem;
-            font-weight: 800;
-            color: var(--accent-color);
-            margin-bottom: 0.5rem;
-        }
-
-        .metric-label {
+        
+        .summary-text {
             color: var(--text-secondary);
-            font-size: 0.9rem;
-            font-weight: 500;
-            text-transform: uppercase;
-            letter-spacing: 0.5px;
+            line-height: 1.6;
+            font-size: 1rem;
         }
-
-        /* Filters */
-        .filters-container {
-            background: var(--secondary-bg);
-            border: 1px solid var(--border-color);
-            border-radius: 16px;
-            padding: 1.5rem;
-            margin-bottom: 2rem;
-            box-shadow: var(--shadow-dark);
-        }
-
-        .filters-title {
-            font-size: 1.2rem;
+        
+        /* Button Styling */
+        .stButton > button {
+            background: linear-gradient(135deg, var(--accent-color), #00a8cc);
+            border: none;
+            color: white;
             font-weight: 600;
-            margin-bottom: 1rem;
-            color: var(--accent-color);
+            padding: 0.5rem 1.5rem;
+            border-radius: 8px;
+            transition: all 0.3s ease;
         }
-
-        .filters-grid {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
-            gap: 1rem;
+        
+        .stButton > button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 8px 25px rgba(0, 212, 255, 0.3);
         }
-
-        .filter-group {
-            display: flex;
-            flex-direction: column;
-            gap: 0.5rem;
-        }
-
-        .filter-label {
-            font-size: 0.9rem;
-            font-weight: 500;
-            color: var(--text-secondary);
-        }
-
-        .filter-select {
+        
+        /* Selectbox Styling */
+        .stSelectbox > div > div {
             background: var(--tertiary-bg);
             border: 1px solid var(--border-color);
             color: var(--text-primary);
-            padding: 0.75rem;
-            border-radius: 8px;
-            font-size: 0.9rem;
         }
-
-        .multi-select {
-            min-height: 120px;
-        }
-
-        /* Charts Container */
-        .charts-container {
-            display: grid;
-            grid-template-columns: 1fr;
-            gap: 2rem;
-            margin-bottom: 2rem;
-        }
-
-        .chart-section {
-            background: var(--secondary-bg);
+        
+        /* Multiselect Styling */
+        .stMultiSelect > div > div {
+            background: var(--tertiary-bg);
             border: 1px solid var(--border-color);
-            border-radius: 16px;
-            padding: 1.5rem;
-            box-shadow: var(--shadow-dark);
         }
-
-        .chart-title {
-            font-size: 1.3rem;
-            font-weight: 600;
-            margin-bottom: 1rem;
-            color: var(--text-primary);
-            display: flex;
-            align-items: center;
-            gap: 0.5rem;
-        }
-
-        .chart-icon {
-            width: 20px;
-            height: 20px;
-            background: var(--accent-color);
-            border-radius: 4px;
-        }
-
-        /* Globe and Bar Charts */
-        .charts-row {
-            display: grid;
-            grid-template-columns: 1fr 1.5fr;
-            gap: 2rem;
-            margin-bottom: 2rem;
-        }
-
-        /* Trends Chart */
-        .trends-container {
+        
+        /* DataFrame Styling */
+        .stDataFrame {
             background: var(--secondary-bg);
-            border: 1px solid var(--border-color);
-            border-radius: 16px;
-            padding: 1.5rem;
-            margin-bottom: 2rem;
-            box-shadow: var(--shadow-dark);
+            border-radius: 12px;
+            overflow: hidden;
         }
-
-        /* Heatmap */
-        .heatmap-container {
-            background: var(--secondary-bg);
-            border: 1px solid var(--border-color);
-            border-radius: 16px;
-            padding: 1.5rem;
-            box-shadow: var(--shadow-dark);
-        }
-
-        /* Loading States */
-        .loading {
+        
+        /* Loading Animation */
+        .loading-animation {
             display: flex;
             justify-content: center;
             align-items: center;
             height: 200px;
-            color: var(--text-secondary);
         }
-
+        
         .spinner {
             width: 40px;
             height: 40px;
@@ -301,571 +253,278 @@
             border-radius: 50%;
             animation: spin 1s linear infinite;
         }
-
+        
         @keyframes spin {
             0% { transform: rotate(0deg); }
             100% { transform: rotate(360deg); }
         }
-
+        
         /* Mobile Responsiveness */
         @media (max-width: 768px) {
-            .header-content {
-                flex-direction: column;
-                gap: 1rem;
-            }
-
-            .main-content {
-                padding: 1rem;
-            }
-
-            .charts-row {
-                grid-template-columns: 1fr;
-            }
-
-            .filters-grid {
-                grid-template-columns: 1fr;
-            }
-
-            .summary-content {
+            .metric-row {
                 grid-template-columns: repeat(2, 1fr);
             }
-        }
-
-        @media (max-width: 480px) {
-            .summary-content {
-                grid-template-columns: 1fr;
+            
+            .header-title {
+                font-size: 2rem;
             }
-
-            .header {
-                padding: 1rem;
+            
+            .metric-value {
+                font-size: 2rem;
             }
         }
-
+        
         /* Custom Scrollbar */
         ::-webkit-scrollbar {
             width: 8px;
         }
-
+        
         ::-webkit-scrollbar-track {
             background: var(--primary-bg);
         }
-
+        
         ::-webkit-scrollbar-thumb {
             background: var(--accent-color);
             border-radius: 4px;
         }
-
-        ::-webkit-scrollbar-thumb:hover {
-            background: #00a8cc;
-        }
-    </style>
-</head>
-<body>
-    <div class="dashboard-container">
-        <header class="header">
-            <div class="header-content">
-                <div class="logo">🛡️ Threat Intelligence Dashboard</div>
-                <div class="header-controls">
-                    <select class="time-selector" id="timeRange">
-                        <option value="7">Last 7 Days</option>
-                        <option value="14">Last 14 Days</option>
-                        <option value="30">Last 30 Days</option>
-                        <option value="90">Last 90 Days</option>
-                    </select>
-                    <button class="refresh-btn" onclick="refreshData()">🔄 Refresh</button>
+        </style>
+        """, unsafe_allow_html=True)
+    
+    # ---------------- Header & Metrics ---------------- #
+    def render_main_header(self, title: str, subtitle: str = ""):
+        """Render the main dashboard header"""
+        st.markdown(f"""
+        <div class="main-header">
+            <h1 class="header-title">🛡️ {title}</h1>
+            {f'<p class="header-subtitle">{subtitle}</p>' if subtitle else ''}
+        </div>
+        """, unsafe_allow_html=True)
+    
+    def render_metric_cards(self, metrics: dict):
+        """Render metric cards in a professional layout"""
+        cols = st.columns(len(metrics))
+        for i, (label, value) in enumerate(metrics.items()):
+            with cols[i]:
+                st.markdown(f"""
+                <div class="metric-card">
+                    <div class="metric-value">{value:,}</div>
+                    <div class="metric-label">{label}</div>
                 </div>
+                """, unsafe_allow_html=True)
+    
+    def render_executive_summary(self, summary_text: str, metrics: dict):
+        """Render executive summary section"""
+        st.markdown(f"""
+        <div class="executive-summary">
+            <div class="summary-text">{summary_text}</div>
+        </div>
+        """, unsafe_allow_html=True)
+        self.render_metric_cards(metrics)
+    
+    # ---------------- Globe ---------------- #
+    def create_professional_globe(self, country_data: dict, height: int = 400):
+        """Create a globe highlighting affected countries with borders"""
+        countries = list(country_data.keys())
+        try:
+            all_country_codes = [country.alpha_3 for country in pycountry.countries]
+        except:
+            all_country_codes = []
+        
+        affected_countries = []
+        for country in countries:
+            try:
+                code = pycountry.countries.lookup(country).alpha_3
+                affected_countries.append(code)
+            except:
+                continue
+        
+        z_data = []
+        locations = []
+        for code in all_country_codes:
+            locations.append(code)
+            z_data.append(1 if code in affected_countries else 0)
+        
+        fig = go.Figure(go.Choropleth(
+            locations=locations,
+            z=z_data,
+            colorscale=[[0, '#1a1d23'], [1, '#00d4ff']],
+            showscale=False,
+            marker_line_color='white',  # keep borders visible
+            marker_line_width=0.5,
+            hovertemplate='<b>%{location}</b><br>Status: %{customdata}<extra></extra>',
+            customdata=['Affected' if z == 1 else 'Not Affected' for z in z_data]
+        ))
+        
+        fig.update_geos(
+            projection_type="orthographic",
+            showcoastlines=True,
+            coastlinecolor="#00d4ff",
+            showland=True,
+            landcolor="#1a1d23",
+            showocean=True,
+            oceancolor="#0a0b0f",
+            showframe=False,
+            bgcolor="#0a0b0f"
+        )
+        
+        fig.update_layout(
+            paper_bgcolor='rgba(0,0,0,0)',
+            plot_bgcolor='rgba(0,0,0,0)',
+            font=dict(color='white'),
+            height=height,
+            margin=dict(t=10, b=10, l=10, r=10)
+        )
+        
+        return fig
+    
+    # ---------------- Charts ---------------- #
+    def create_professional_bar_chart(self, data: dict, title: str, orientation: str = "v"):
+        if orientation == "h":
+            fig = go.Figure(go.Bar(
+                y=list(data.keys()),
+                x=list(data.values()),
+                orientation='h',
+                marker=dict(
+                    color=list(data.values()),
+                    colorscale=[[0, '#2a2d35'], [0.5, '#00a8cc'], [1, '#00d4ff']],
+                    line=dict(color='#00d4ff', width=1)
+                ),
+                text=list(data.values()),
+                textposition='inside',
+                textfont=dict(color='white', size=12, family='Inter'),
+                hovertemplate='<b>%{y}</b><br>Count: %{x}<extra></extra>'
+            ))
+        else:
+            fig = go.Figure(go.Bar(
+                x=list(data.keys()),
+                y=list(data.values()),
+                marker=dict(
+                    color=list(data.values()),
+                    colorscale=[[0, '#2a2d35'], [0.5, '#00a8cc'], [1, '#00d4ff']],
+                    line=dict(color='#00d4ff', width=1)
+                ),
+                text=list(data.values()),
+                textposition='inside',
+                textfont=dict(color='white', size=12, family='Inter'),
+                hovertemplate='<b>%{x}</b><br>Count: %{y}<extra></extra>'
+            ))
+        fig.update_layout(
+            paper_bgcolor='rgba(0,0,0,0)',
+            plot_bgcolor='rgba(0,0,0,0)',
+            font=dict(color='white'),
+            xaxis=dict(gridcolor='#3a3d45', zerolinecolor='#3a3d45'),
+            yaxis=dict(gridcolor='#3a3d45', zerolinecolor='#3a3d45'),
+            margin=dict(t=20, b=40, l=40, r=40)
+        )
+        return fig
+    
+def create_professional_table_heatmap(self, data: pd.DataFrame, x_col: str, y_col: str, value_col: str):
+    """
+    Minimalistic table-like heatmap:
+    - No colors on cells
+    - Grid lines visible
+    - Numbers displayed with spacing
+    - Zeros hidden
+    """
+    pivot_data = data.pivot(index=y_col, columns=x_col, values=value_col).fillna(0)
+
+    # Replace zeros with empty string for text
+    text_values = pivot_data.values.astype(int).astype(str)
+    text_values[pivot_data.values == 0] = ""
+
+    # Create heatmap with transparent colors
+    fig = go.Figure(go.Heatmap(
+        z=np.zeros_like(pivot_data.values),  # all zero: no color
+        x=list(pivot_data.columns),
+        y=list(pivot_data.index),
+        text=text_values,
+        texttemplate="%{text}",
+        textfont=dict(size=16, color="white", family='Inter'),
+        colorscale=[[0, "rgba(0,0,0,0)"], [1, "rgba(0,0,0,0)"]],  # fully transparent
+        showscale=False,
+        xgap=2,  # space between columns
+        ygap=2,  # space between rows
+        hovertemplate=f'{x_col}: %{{x}}<br>{y_col}: %{{y}}<br>Count: %{{text}}<extra></extra>'
+    ))
+
+    fig.update_layout(
+        paper_bgcolor='rgba(0,0,0,0)',
+        plot_bgcolor='rgba(0,0,0,0)',
+        xaxis=dict(gridcolor='rgba(255,255,255,0.3)', zeroline=False, tickangle=-45),
+        yaxis=dict(gridcolor='rgba(255,255,255,0.3)', zeroline=False, autorange='reversed'),
+        margin=dict(t=20, b=80, l=150, r=20),
+        height=500
+    )
+
+    return fig
+    
+    def create_trend_chart(self, data: pd.DataFrame, x_col: str, y_col: str, category_col: str):
+        fig = go.Figure()
+        categories = data[category_col].unique()[:10]
+        colors = px.colors.qualitative.Set3
+        for i, category in enumerate(categories):
+            category_data = data[data[category_col] == category]
+            fig.add_trace(go.Scatter(
+                x=category_data[x_col],
+                y=category_data[y_col],
+                mode='lines+markers',
+                name=category,
+                line=dict(color=colors[i % len(colors)], width=3),
+                marker=dict(size=6)
+            ))
+        fig.update_layout(
+            paper_bgcolor='rgba(0,0,0,0)',
+            plot_bgcolor='rgba(0,0,0,0)',
+            font=dict(color='white'),
+            xaxis=dict(gridcolor='#3a3d45', zerolinecolor='#3a3d45'),
+            yaxis=dict(gridcolor='#3a3d45', zerolinecolor='#3a3d45'),
+            legend=dict(bgcolor='rgba(42, 45, 53, 0.8)', bordercolor='#3a3d45', font=dict(color='white')),
+            height=400,
+            margin=dict(t=20, b=40, l=40, r=40)
+        )
+        return fig
+    
+    # ---------------- Loading & Footer ---------------- #
+    def render_loading_spinner(self, message: str = "Loading..."):
+        st.markdown(f"""
+        <div class="loading-animation">
+            <div class="spinner"></div>
+            <span style="margin-left: 1rem; color: var(--text-secondary);">{message}</span>
+        </div>
+        """, unsafe_allow_html=True)
+    
+    def render_chart_container(self, title: str, chart_func, *args, **kwargs):
+        st.markdown(f"""
+        <div class="chart-container">
+            <h3 class="chart-title">
+                <span class="chart-icon"></span>
+                {title}
+            </h3>
+        </div>
+        """, unsafe_allow_html=True)
+        chart = chart_func(*args, **kwargs)
+        st.plotly_chart(chart, use_container_width=True)
+    
+    def create_download_button(self, df: pd.DataFrame, filename: str, label: str = "Download Data"):
+        output = BytesIO()
+        with pd.ExcelWriter(output, engine="openpyxl") as writer:
+            df.to_excel(writer, index=False, sheet_name="Data")
+        output.seek(0)
+        st.download_button(
+            label=f"📥 {label}",
+            data=output,
+            file_name=filename,
+            mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+        )
+    
+    def render_footer(self):
+        st.markdown("""
+        <div style="margin-top: 3rem; padding: 2rem 0; border-top: 1px solid var(--border-color);">
+            <div style="text-align: center; color: var(--text-secondary); font-size: 0.9rem;">
+                <p>🛡️ <strong>Professional Threat Intelligence Dashboard</strong></p>
+                <p>Created with ❤️ by <a href="https://www.linkedin.com/in/ricardopinto110993/" target="_blank" 
+                   style="color: var(--accent-color); text-decoration: none;">Ricardo Mendes Pinto</a></p>
+                <p><em>Powered by Python, Streamlit & Advanced Analytics</em></p>
             </div>
-        </header>
-
-        <main class="main-content">
-            <!-- Executive Summary -->
-            <section class="executive-summary">
-                <h2 class="summary-title">📊 Executive Summary</h2>
-                <p id="summaryText">Loading threat intelligence summary...</p>
-                <div class="summary-content">
-                    <div class="metric-card">
-                        <div class="metric-value" id="totalThreats">0</div>
-                        <div class="metric-label">Total Threats</div>
-                    </div>
-                    <div class="metric-card">
-                        <div class="metric-value" id="uniqueCountries">0</div>
-                        <div class="metric-label">Affected Countries</div>
-                    </div>
-                    <div class="metric-card">
-                        <div class="metric-value" id="attackTechniques">0</div>
-                        <div class="metric-label">Attack Techniques</div>
-                    </div>
-                    <div class="metric-card">
-                        <div class="metric-value" id="humanTargeted">0</div>
-                        <div class="metric-label">Human-Targeted</div>
-                    </div>
-                </div>
-            </section>
-
-            <!-- Filters -->
-            <section class="filters-container">
-                <h3 class="filters-title">🔍 Filters</h3>
-                <div class="filters-grid">
-                    <div class="filter-group">
-                        <label class="filter-label">Countries</label>
-                        <select class="filter-select multi-select" id="countryFilter" multiple>
-                            <option value="">All Countries</option>
-                        </select>
-                    </div>
-                    <div class="filter-group">
-                        <label class="filter-label">Attack Techniques</label>
-                        <select class="filter-select multi-select" id="techniqueFilter" multiple>
-                            <option value="">All Techniques</option>
-                        </select>
-                    </div>
-                    <div class="filter-group">
-                        <label class="filter-label">Threat Type</label>
-                        <select class="filter-select" id="threatTypeFilter">
-                            <option value="all">All Threats</option>
-                            <option value="human">Human-Targeted</option>
-                            <option value="general">General Attacks</option>
-                        </select>
-                    </div>
-                </div>
-            </section>
-
-            <!-- Charts Row -->
-            <div class="charts-row">
-                <section class="chart-section">
-                    <h3 class="chart-title">
-                        <div class="chart-icon"></div>
-                        🌍 Global Threat Distribution
-                    </h3>
-                    <div id="globeChart"></div>
-                </section>
-
-                <section class="chart-section">
-                    <h3 class="chart-title">
-                        <div class="chart-icon"></div>
-                        📊 Top Attack Techniques
-                    </h3>
-                    <div id="techniqueChart"></div>
-                </section>
-            </div>
-
-            <!-- Trends Chart -->
-            <section class="trends-container">
-                <h3 class="chart-title">
-                    <div class="chart-icon"></div>
-                    📈 Threat Trends Over Time
-                </h3>
-                <div id="trendsChart"></div>
-            </section>
-
-            <!-- Countries Chart -->
-            <section class="chart-section">
-                <h3 class="chart-title">
-                    <div class="chart-icon"></div>
-                    🏳️ Countries by Threat Volume
-                </h3>
-                <div id="countryChart"></div>
-            </section>
-
-            <!-- Heatmap -->
-            <section class="heatmap-container">
-                <h3 class="chart-title">
-                    <div class="chart-icon"></div>
-                    🔥 Techniques vs Countries Heatmap
-                </h3>
-                <div id="heatmapChart"></div>
-            </section>
-        </main>
-    </div>
-
-    <script>
-        // Global variables
-        let currentData = null;
-        let filteredData = null;
-        let isLoading = false;
-
-        // Sample data structure (replace with actual API calls)
-        const sampleData = {
-            threats: [
-                {
-                    id: 1,
-                    title: "APT28 Phishing Campaign Targets Government Officials",
-                    country: "United States",
-                    technique: "Phishing (T1566.002)",
-                    date: "2025-01-15",
-                    severity: "high",
-                    humanTargeted: true,
-                    threatActor: "APT28"
-                },
-                {
-                    id: 2,
-                    title: "Ransomware Attack on Healthcare Infrastructure",
-                    country: "Germany", 
-                    technique: "Data Encrypted for Impact (T1486)",
-                    date: "2025-01-14",
-                    severity: "critical",
-                    humanTargeted: false,
-                    threatActor: "LockBit"
-                },
-                {
-                    id: 3,
-                    title: "Social Engineering Campaign Targets Financial Sector",
-                    country: "United Kingdom",
-                    technique: "Social Engineering (T1566)",
-                    date: "2025-01-13",
-                    severity: "medium",
-                    humanTargeted: true,
-                    threatActor: "Unknown"
-                },
-                {
-                    id: 4,
-                    title: "Supply Chain Compromise in Software Updates",
-                    country: "Japan",
-                    technique: "Supply Chain Compromise (T1195)",
-                    date: "2025-01-12",
-                    severity: "high",
-                    humanTargeted: false,
-                    threatActor: "APT41"
-                },
-                {
-                    id: 5,
-                    title: "Credential Dumping via Mimikatz",
-                    country: "France",
-                    technique: "Credential Dumping (T1003)",
-                    date: "2025-01-11",
-                    severity: "medium",
-                    humanTargeted: true,
-                    threatActor: "Lazarus Group"
-                }
-            ],
-            countries: ["United States", "Germany", "United Kingdom", "Japan", "France", "China", "Russia", "Brazil"],
-            techniques: [
-                "Phishing (T1566.002)",
-                "Data Encrypted for Impact (T1486)", 
-                "Social Engineering (T1566)",
-                "Supply Chain Compromise (T1195)",
-                "Credential Dumping (T1003)",
-                "Brute Force (T1110)",
-                "Command Line Interface (T1059.003)"
-            ]
-        };
-
-        // Initialize dashboard
-        document.addEventListener('DOMContentLoaded', function() {
-            initializeDashboard();
-        });
-
-        function initializeDashboard() {
-            currentData = sampleData;
-            filteredData = currentData;
-            
-            populateFilters();
-            updateExecutiveSummary();
-            createCharts();
-            setupEventListeners();
-        }
-
-        function populateFilters() {
-            // Populate country filter
-            const countryFilter = document.getElementById('countryFilter');
-            currentData.countries.forEach(country => {
-                const option = document.createElement('option');
-                option.value = country;
-                option.textContent = country;
-                countryFilter.appendChild(option);
-            });
-
-            // Populate technique filter
-            const techniqueFilter = document.getElementById('techniqueFilter');
-            currentData.techniques.forEach(technique => {
-                const option = document.createElement('option');
-                option.value = technique;
-                option.textContent = technique;
-                techniqueFilter.appendChild(option);
-            });
-        }
-
-        function updateExecutiveSummary() {
-            const data = filteredData.threats;
-            
-            // Calculate metrics
-            const totalThreats = data.length;
-            const uniqueCountries = [...new Set(data.map(t => t.country))].length;
-            const attackTechniques = [...new Set(data.map(t => t.technique))].length;
-            const humanTargeted = data.filter(t => t.humanTargeted).length;
-
-            // Update DOM
-            document.getElementById('totalThreats').textContent = totalThreats;
-            document.getElementById('uniqueCountries').textContent = uniqueCountries;
-            document.getElementById('attackTechniques').textContent = attackTechniques;
-            document.getElementById('humanTargeted').textContent = humanTargeted;
-
-            // Generate summary text
-            const timeRange = document.getElementById('timeRange').value;
-            const summaryText = `Over the past ${timeRange} days, our threat intelligence system detected ${totalThreats} security incidents across ${uniqueCountries} countries. ${humanTargeted} incidents (${Math.round(humanTargeted/totalThreats*100)}%) were specifically targeting human assets through social engineering and phishing campaigns. The most prevalent attack techniques included data encryption for impact and credential access methods.`;
-            
-            document.getElementById('summaryText').textContent = summaryText;
-        }
-
-        function createCharts() {
-            createGlobeChart();
-            createTechniqueChart();
-            createTrendsChart();
-            createCountryChart();
-            createHeatmapChart();
-        }
-
-        function createGlobeChart() {
-            const data = filteredData.threats;
-            const countryCounts = {};
-            
-            data.forEach(threat => {
-                countryCounts[threat.country] = (countryCounts[threat.country] || 0) + 1;
-            });
-
-            const countries = Object.keys(countryCounts);
-            const values = Object.values(countryCounts);
-
-            const trace = {
-                type: 'choropleth',
-                locations: countries,
-                z: values,
-                locationmode: 'country names',
-                colorscale: [
-                    [0, '#1a1d23'],
-                    [0.2, '#2a2d35'],
-                    [0.4, '#3a3d45'],
-                    [0.6, '#00a8cc'],
-                    [0.8, '#00d4ff'],
-                    [1, '#00ff88']
-                ],
-                colorbar: {
-                    title: 'Threat Count',
-                    titlefont: { color: '#ffffff' },
-                    tickfont: { color: '#b0b3b8' },
-                    bgcolor: 'rgba(42, 45, 53, 0.8)',
-                    bordercolor: '#3a3d45'
-                },
-                hovertemplate: '<b>%{locations}</b><br>Threats: %{z}<extra></extra>'
-            };
-
-            const layout = {
-                title: {
-                    text: '',
-                    font: { color: '#ffffff' }
-                },
-                geo: {
-                    projection: { type: 'orthographic' },
-                    showcoastlines: true,
-                    coastlinecolor: '#00d4ff',
-                    showland: true,
-                    landcolor: '#1a1d23',
-                    showocean: true,
-                    oceancolor: '#0a0b0f',
-                    showframe: false,
-                    bgcolor: '#0a0b0f'
-                },
-                paper_bgcolor: 'rgba(0,0,0,0)',
-                plot_bgcolor: 'rgba(0,0,0,0)',
-                font: { color: '#ffffff' },
-                margin: { t: 20, b: 20, l: 20, r: 20 },
-                height: 400
-            };
-
-            Plotly.newPlot('globeChart', [trace], layout, { responsive: true, displayModeBar: false });
-        }
-
-        function createTechniqueChart() {
-            const data = filteredData.threats;
-            const techniqueCounts = {};
-            
-            data.forEach(threat => {
-                techniqueCounts[threat.technique] = (techniqueCounts[threat.technique] || 0) + 1;
-            });
-
-            const techniques = Object.keys(techniqueCounts).slice(0, 10);
-            const values = Object.values(techniqueCounts).slice(0, 10);
-
-            const trace = {
-                type: 'bar',
-                y: techniques,
-                x: values,
-                orientation: 'h',
-                marker: {
-                    color: values.map((_, i) => `rgba(0, 212, 255, ${0.8 - i * 0.1})`),
-                    line: { color: '#00d4ff', width: 1 }
-                },
-                hovertemplate: '<b>%{y}</b><br>Count: %{x}<extra></extra>'
-            };
-
-            const layout = {
-                title: {
-                    text: '',
-                    font: { color: '#ffffff' }
-                },
-                paper_bgcolor: 'rgba(0,0,0,0)',
-                plot_bgcolor: 'rgba(0,0,0,0)',
-                font: { color: '#ffffff' },
-                margin: { t: 20, b: 40, l: 200, r: 20 },
-                height: 400,
-                xaxis: {
-                    gridcolor: '#3a3d45',
-                    zerolinecolor: '#3a3d45',
-                    color: '#b0b3b8'
-                },
-                yaxis: {
-                    gridcolor: '#3a3d45',
-                    color: '#b0b3b8'
-                }
-            };
-
-            Plotly.newPlot('techniqueChart', [trace], layout, { responsive: true, displayModeBar: false });
-        }
-
-        function createTrendsChart() {
-            const data = filteredData.threats;
-            const timeRange = parseInt(document.getElementById('timeRange').value);
-            
-            // Group data by date and technique
-            const trendsData = {};
-            const dates = [];
-            
-            for (let i = timeRange - 1; i >= 0; i--) {
-                const date = new Date();
-                date.setDate(date.getDate() - i);
-                const dateStr = date.toISOString().split('T')[0];
-                dates.push(dateStr);
-                trendsData[dateStr] = {};
-            }
-
-            // Fill with sample data
-            data.forEach(threat => {
-                if (trendsData[threat.date]) {
-                    if (!trendsData[threat.date][threat.technique]) {
-                        trendsData[threat.date][threat.technique] = 0;
-                    }
-                    trendsData[threat.date][threat.technique]++;
-                }
-            });
-
-            // Get top techniques
-            const topTechniques = [...new Set(data.map(t => t.technique))].slice(0, 5);
-            
-            const traces = topTechniques.map((technique, index) => ({
-                type: 'scatter',
-                mode: 'lines+markers',
-                name: technique.split('(')[0].trim(),
-                x: dates,
-                y: dates.map(date => trendsData[date][technique] || 0),
-                line: {
-                    color: `hsl(${index * 60}, 70%, 60%)`,
-                    width: 3
-                },
-                marker: {
-                    size: 6,
-                    color: `hsl(${index * 60}, 70%, 60%)`
-                }
-            }));
-
-            const layout = {
-                title: {
-                    text: '',
-                    font: { color: '#ffffff' }
-                },
-                paper_bgcolor: 'rgba(0,0,0,0)',
-                plot_bgcolor: 'rgba(0,0,0,0)',
-                font: { color: '#ffffff' },
-                margin: { t: 20, b: 40, l: 40, r: 20 },
-                height: 400,
-                xaxis: {
-                    gridcolor: '#3a3d45',
-                    zerolinecolor: '#3a3d45',
-                    color: '#b0b3b8'
-                },
-                yaxis: {
-                    gridcolor: '#3a3d45',
-                    zerolinecolor: '#3a3d45',
-                    color: '#b0b3b8'
-                },
-                legend: {
-                    font: { color: '#ffffff' },
-                    bgcolor: 'rgba(42, 45, 53, 0.8)',
-                    bordercolor: '#3a3d45'
-                }
-            };
-
-            Plotly.newPlot('trendsChart', traces, layout, { responsive: true, displayModeBar: false });
-        }
-
-        function createCountryChart() {
-            const data = filteredData.threats;
-            const countryCounts = {};
-            
-            data.forEach(threat => {
-                countryCounts[threat.country] = (countryCounts[threat.country] || 0) + 1;
-            });
-
-            const countries = Object.keys(countryCounts);
-            const values = Object.values(countryCounts);
-
-            const trace = {
-                type: 'bar',
-                x: countries,
-                y: values,
-                marker: {
-                    color: values.map(v => `rgba(0, 212, 255, ${0.4 + (v / Math.max(...values)) * 0.6})`),
-                    line: { color: '#00d4ff', width: 1 }
-                },
-                hovertemplate: '<b>%{x}</b><br>Threats: %{y}<extra></extra>'
-            };
-
-            const layout = {
-                title: {
-                    text: '',
-                    font: { color: '#ffffff' }
-                },
-                paper_bgcolor: 'rgba(0,0,0,0)',
-                plot_bgcolor: 'rgba(0,0,0,0)',
-                font: { color: '#ffffff' },
-                margin: { t: 20, b: 80, l: 40, r: 20 },
-                height: 400,
-                xaxis: {
-                    gridcolor: '#3a3d45',
-                    zerolinecolor: '#3a3d45',
-                    color: '#b0b3b8',
-                    tickangle: -45
-                },
-                yaxis: {
-                    gridcolor: '#3a3d45',
-                    zerolinecolor: '#3a3d45',
-                    color: '#b0b3b8'
-                }
-            };
-
-            Plotly.newPlot('countryChart', [trace], layout, { responsive: true, displayModeBar: false });
-        }
-
-        function createHeatmapChart() {
-            const data = filteredData.threats;
-            const countries = [...new Set(data.map(t => t.country))];
-            const techniques = [...new Set(data.map(t => t.technique))];
-            
-            // Create matrix
-            const matrix = techniques.map(technique => 
-                countries.map(country => {
-                    const count = data.filter(t => t.country === country && t.technique === technique).length;
-                    return count;
-                })
-            );
-
-            const trace = {
-                type: 'heatmap',
-                z: matrix,
-                x: countries,
-                y: techniques.map(t => t.split('(')[0].trim()),
-                colorscale: [
-                    [0, '#1a1d23'],
-                    [0.2, '#2a2d35'],
-                    [0.4, '#3a3d45'],
-                    [0.6, '#00a8cc'],
-                    [0.8, '#00d4ff'],
-                    [1, '#00ff88']
+        </div>
+        """, unsafe_allow_html=True)
