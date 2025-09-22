@@ -1,530 +1,992 @@
-#!/usr/bin/env python3
 """
-Enhanced UI components module with professional styling for Streamlit
-File: modules/ui_components.py
+Futuristic UI Components for Cybersecurity Dashboard
 """
+
 import streamlit as st
 import plotly.graph_objects as go
 import plotly.express as px
-import numpy as np
+from datetime import datetime, timedelta
 import pandas as pd
-import pycountry
-from io import BytesIO
+import numpy as np
 
-class UIComponents:
-    """Enhanced UI components with professional styling"""
+def apply_futuristic_theme():
+    """Apply futuristic CSS styling to the entire dashboard"""
+    st.markdown("""
+    <style>
+    /* Import Google Fonts */
+    @import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&display=swap');
     
-    def __init__(self):
-        """Initialize UI components with custom styling"""
-        self.setup_page_config()
-        self.inject_custom_css()
+    /* Main app background */
+    .stApp {
+        background: linear-gradient(135deg, #0a0e27 0%, #151934 50%, #1a0033 100%);
+        background-attachment: fixed;
+    }
     
-    def setup_page_config(self):
-        """Configure Streamlit page settings - only call once"""
-        try:
-            st.set_page_config(
-                page_title="🛡️ Threat Intelligence Dashboard",
-                page_icon="🛡️",
-                layout="wide",
-                initial_sidebar_state="expanded"
+    /* Animated background effect */
+    .stApp::before {
+        content: '';
+        position: fixed;
+        top: 0;
+        left: 0;
+        width: 100%;
+        height: 100%;
+        background: 
+            radial-gradient(circle at 20% 80%, rgba(191, 0, 255, 0.1) 0%, transparent 50%),
+            radial-gradient(circle at 80% 20%, rgba(0, 255, 255, 0.1) 0%, transparent 50%);
+        pointer-events: none;
+        z-index: 0;
+        animation: float 20s ease-in-out infinite;
+    }
+    
+    @keyframes float {
+        0%, 100% { transform: translate(0, 0); }
+        33% { transform: translate(-20px, -20px); }
+        66% { transform: translate(20px, -10px); }
+    }
+    
+    /* Headers styling */
+    h1 {
+        font-family: 'Orbitron', monospace !important;
+        background: linear-gradient(90deg, #00ffff, #bf00ff);
+        -webkit-background-clip: text;
+        -webkit-text-fill-color: transparent;
+        background-clip: text;
+        text-transform: uppercase;
+        letter-spacing: 3px;
+        font-weight: 900 !important;
+        text-align: center;
+        padding: 20px 0;
+        font-size: 3em !important;
+        text-shadow: 0 0 30px rgba(0, 255, 255, 0.5);
+    }
+    
+    h2 {
+        font-family: 'Orbitron', monospace !important;
+        color: #00ffff !important;
+        text-transform: uppercase;
+        letter-spacing: 2px;
+        font-weight: 700 !important;
+        margin-top: 2rem !important;
+        text-shadow: 0 0 20px rgba(0, 255, 255, 0.4);
+    }
+    
+    h3 {
+        font-family: 'Orbitron', monospace !important;
+        color: #bf00ff !important;
+        text-transform: uppercase;
+        letter-spacing: 1px;
+        font-weight: 600 !important;
+        text-shadow: 0 0 15px rgba(191, 0, 255, 0.4);
+    }
+    
+    /* Sidebar styling */
+    .css-1d391kg, [data-testid="stSidebar"] {
+        background: rgba(20, 25, 47, 0.95);
+        backdrop-filter: blur(20px);
+        border-right: 2px solid rgba(0, 255, 255, 0.3);
+    }
+    
+    .css-1d391kg .block-container {
+        padding-top: 2rem;
+    }
+    
+    /* Metric cards */
+    [data-testid="metric-container"] {
+        background: rgba(20, 25, 47, 0.7);
+        backdrop-filter: blur(10px);
+        border: 1px solid rgba(0, 255, 255, 0.3);
+        padding: 20px;
+        border-radius: 15px;
+        box-shadow: 
+            0 0 20px rgba(0, 255, 255, 0.2),
+            inset 0 0 20px rgba(191, 0, 255, 0.05);
+        transition: all 0.3s ease;
+    }
+    
+    [data-testid="metric-container"]:hover {
+        transform: translateY(-5px);
+        border-color: rgba(0, 255, 255, 0.5);
+        box-shadow: 
+            0 10px 40px rgba(0, 255, 255, 0.3),
+            inset 0 0 30px rgba(191, 0, 255, 0.1);
+    }
+    
+    [data-testid="metric-container"] label {
+        font-family: 'Orbitron', monospace !important;
+        color: #b8bcc8 !important;
+        text-transform: uppercase;
+        letter-spacing: 1px;
+        font-size: 0.9em !important;
+    }
+    
+    [data-testid="metric-container"] > div > div > div {
+        font-family: 'Orbitron', monospace !important;
+        font-size: 2.5em !important;
+        font-weight: 700 !important;
+        background: linear-gradient(45deg, #00ffff, #ff00bf);
+        -webkit-background-clip: text;
+        -webkit-text-fill-color: transparent;
+        background-clip: text;
+    }
+    
+    /* Selectbox and multiselect styling */
+    .stSelectbox > div > div, .stMultiSelect > div > div {
+        background: rgba(0, 0, 0, 0.4) !important;
+        border: 1px solid rgba(0, 255, 255, 0.3) !important;
+        border-radius: 10px !important;
+        color: #ffffff !important;
+        transition: all 0.3s ease;
+    }
+    
+    .stSelectbox > div > div:hover, .stMultiSelect > div > div:hover {
+        border-color: rgba(0, 255, 255, 0.6) !important;
+        box-shadow: 0 0 15px rgba(0, 255, 255, 0.3) !important;
+    }
+    
+    /* Date input styling */
+    .stDateInput > div > div {
+        background: rgba(0, 0, 0, 0.4) !important;
+        border: 1px solid rgba(191, 0, 255, 0.3) !important;
+        border-radius: 10px !important;
+        color: #ffffff !important;
+    }
+    
+    .stDateInput > div > div:hover {
+        border-color: rgba(191, 0, 255, 0.6) !important;
+        box-shadow: 0 0 15px rgba(191, 0, 255, 0.3) !important;
+    }
+    
+    /* Button styling */
+    .stButton > button {
+        font-family: 'Orbitron', monospace !important;
+        background: linear-gradient(45deg, #00ffff, #bf00ff);
+        color: #ffffff !important;
+        border: none !important;
+        border-radius: 10px !important;
+        padding: 10px 30px !important;
+        font-weight: 600 !important;
+        text-transform: uppercase !important;
+        letter-spacing: 1px !important;
+        transition: all 0.3s ease !important;
+        box-shadow: 0 4px 15px rgba(0, 255, 255, 0.3);
+    }
+    
+    .stButton > button:hover {
+        transform: translateY(-3px) !important;
+        box-shadow: 0 6px 25px rgba(191, 0, 255, 0.4) !important;
+        background: linear-gradient(45deg, #bf00ff, #ff00bf) !important;
+    }
+    
+    /* Expander styling */
+    .streamlit-expanderHeader {
+        font-family: 'Orbitron', monospace !important;
+        background: rgba(20, 25, 47, 0.7) !important;
+        border: 1px solid rgba(255, 0, 191, 0.3) !important;
+        border-radius: 10px !important;
+        color: #ff00bf !important;
+    }
+    
+    .streamlit-expanderHeader:hover {
+        border-color: rgba(255, 0, 191, 0.5) !important;
+        box-shadow: 0 0 20px rgba(255, 0, 191, 0.3) !important;
+    }
+    
+    /* Info, warning, error boxes */
+    .stAlert {
+        background: rgba(20, 25, 47, 0.9) !important;
+        border: 1px solid rgba(0, 255, 255, 0.4) !important;
+        border-radius: 10px !important;
+        color: #ffffff !important;
+        backdrop-filter: blur(10px);
+    }
+    
+    /* Tables */
+    .dataframe {
+        background: rgba(20, 25, 47, 0.7) !important;
+        border: 1px solid rgba(0, 255, 255, 0.3) !important;
+        border-radius: 10px !important;
+        color: #ffffff !important;
+    }
+    
+    .dataframe thead tr th {
+        background: rgba(0, 255, 255, 0.1) !important;
+        color: #00ffff !important;
+        font-family: 'Orbitron', monospace !important;
+        text-transform: uppercase;
+        letter-spacing: 1px;
+    }
+    
+    .dataframe tbody tr:hover {
+        background: rgba(191, 0, 255, 0.1) !important;
+    }
+    
+    /* Plotly charts background */
+    .js-plotly-plot {
+        border-radius: 15px !important;
+        overflow: hidden !important;
+        box-shadow: 0 0 30px rgba(0, 255, 255, 0.2) !important;
+    }
+    
+    /* Text color */
+    p, span, div {
+        color: #b8bcc8 !important;
+    }
+    
+    /* Loading spinner */
+    .stSpinner > div {
+        border-color: #00ffff !important;
+    }
+    
+    /* Custom scrollbar */
+    ::-webkit-scrollbar {
+        width: 10px;
+        height: 10px;
+    }
+    
+    ::-webkit-scrollbar-track {
+        background: #0a0e27;
+        border-radius: 5px;
+    }
+    
+    ::-webkit-scrollbar-thumb {
+        background: linear-gradient(180deg, #00ffff, #bf00ff);
+        border-radius: 5px;
+    }
+    
+    ::-webkit-scrollbar-thumb:hover {
+        background: linear-gradient(180deg, #bf00ff, #ff00bf);
+    }
+    
+    /* Column containers */
+    [data-testid="column"] {
+        background: rgba(20, 25, 47, 0.3);
+        backdrop-filter: blur(5px);
+        border-radius: 15px;
+        padding: 15px;
+        border: 1px solid rgba(0, 255, 255, 0.1);
+        margin: 5px;
+    }
+    
+    /* Tab styling */
+    .stTabs [data-baseweb="tab-list"] {
+        background: rgba(20, 25, 47, 0.5);
+        border-radius: 10px;
+        padding: 5px;
+    }
+    
+    .stTabs [data-baseweb="tab"] {
+        font-family: 'Orbitron', monospace !important;
+        color: #b8bcc8 !important;
+        background: transparent !important;
+        border-radius: 8px !important;
+        text-transform: uppercase;
+        letter-spacing: 1px;
+    }
+    
+    .stTabs [aria-selected="true"] {
+        background: linear-gradient(45deg, #00ffff, #bf00ff) !important;
+        color: #ffffff !important;
+    }
+    
+    /* Progress bar */
+    .stProgress > div > div > div {
+        background: linear-gradient(90deg, #00ffff, #bf00ff, #ff00bf) !important;
+    }
+    
+    /* Caption text */
+    .caption {
+        font-family: 'Orbitron', monospace !important;
+        color: #00ffff !important;
+        text-transform: uppercase;
+        letter-spacing: 1px;
+        font-size: 0.8em !important;
+    }
+    </style>
+    """, unsafe_allow_html=True)
+
+def create_futuristic_header(title, subtitle=None):
+    """Create a futuristic animated header"""
+    header_html = f"""
+    <div style="text-align: center; padding: 30px; background: rgba(20, 25, 47, 0.7); 
+                backdrop-filter: blur(20px); border-radius: 20px; 
+                border: 2px solid rgba(0, 255, 255, 0.3); margin-bottom: 30px;
+                box-shadow: 0 0 40px rgba(0, 255, 255, 0.2), inset 0 0 20px rgba(191, 0, 255, 0.05);">
+        <h1 style="margin: 0; animation: glow 2s ease-in-out infinite alternate;">
+            {title}
+        </h1>
+        {f'<p style="color: #b8bcc8; font-size: 1.1em; margin-top: 10px; letter-spacing: 2px; text-transform: uppercase;">{subtitle}</p>' if subtitle else ''}
+    </div>
+    <style>
+        @keyframes glow {{
+            from {{ text-shadow: 0 0 20px rgba(0, 255, 255, 0.5), 0 0 40px rgba(191, 0, 255, 0.3); }}
+            to {{ text-shadow: 0 0 30px rgba(0, 255, 255, 0.7), 0 0 60px rgba(191, 0, 255, 0.5); }}
+        }}
+    </style>
+    """
+    st.markdown(header_html, unsafe_allow_html=True)
+
+def create_metric_card(label, value, delta=None, delta_color="normal"):
+    """Create a futuristic metric card with glow effect"""
+    delta_html = ""
+    if delta is not None:
+        delta_symbol = "↑" if delta > 0 else "↓"
+        delta_color_code = "#00ff00" if delta > 0 else "#ff0000"
+        delta_html = f'<div style="color: {delta_color_code}; font-size: 1.2em;">{delta_symbol} {abs(delta)}%</div>'
+    
+    card_html = f"""
+    <div style="background: rgba(20, 25, 47, 0.8); backdrop-filter: blur(10px);
+                border: 1px solid rgba(0, 255, 255, 0.3); border-radius: 15px;
+                padding: 20px; text-align: center; height: 150px;
+                transition: all 0.3s ease; cursor: pointer;
+                box-shadow: 0 0 20px rgba(0, 255, 255, 0.2);"
+         onmouseover="this.style.transform='translateY(-5px)'; this.style.boxShadow='0 10px 40px rgba(0, 255, 255, 0.4)';"
+         onmouseout="this.style.transform='translateY(0)'; this.style.boxShadow='0 0 20px rgba(0, 255, 255, 0.2)';">
+        <div style="color: #b8bcc8; font-size: 0.9em; text-transform: uppercase; 
+                    letter-spacing: 1px; margin-bottom: 10px; font-family: 'Orbitron', monospace;">
+            {label}
+        </div>
+        <div style="font-size: 2.5em; font-weight: bold; font-family: 'Orbitron', monospace;
+                    background: linear-gradient(45deg, #00ffff, #ff00bf);
+                    -webkit-background-clip: text; -webkit-text-fill-color: transparent;">
+            {value}
+        </div>
+        {delta_html}
+    </div>
+    """
+    st.markdown(card_html, unsafe_allow_html=True)
+
+def get_futuristic_plot_layout():
+    """Get default layout configuration for Plotly charts with futuristic theme"""
+    return dict(
+        plot_bgcolor='rgba(20, 25, 47, 0.1)',
+        paper_bgcolor='rgba(20, 25, 47, 0.7)',
+        font=dict(
+            family="Orbitron, monospace",
+            color='#b8bcc8'
+        ),
+        title=dict(
+            font=dict(
+                size=20,
+                color='#00ffff'
             )
-        except:
-            pass  # Already configured
+        ),
+        xaxis=dict(
+            gridcolor='rgba(0, 255, 255, 0.1)',
+            zerolinecolor='rgba(0, 255, 255, 0.2)',
+            showgrid=True,
+            zeroline=True
+        ),
+        yaxis=dict(
+            gridcolor='rgba(191, 0, 255, 0.1)',
+            zerolinecolor='rgba(191, 0, 255, 0.2)',
+            showgrid=True,
+            zeroline=True
+        ),
+        hoverlabel=dict(
+            bgcolor='rgba(20, 25, 47, 0.9)',
+            bordercolor='#00ffff',
+            font=dict(
+                family="Orbitron, monospace",
+                color='#ffffff'
+            )
+        ),
+        margin=dict(l=40, r=40, t=60, b=40),
+        showlegend=True,
+        legend=dict(
+            bgcolor='rgba(20, 25, 47, 0.5)',
+            bordercolor='rgba(0, 255, 255, 0.3)',
+            borderwidth=1,
+            font=dict(color='#b8bcc8')
+        )
+    )
+
+def get_neon_color_palette():
+    """Get neon color palette for charts"""
+    return [
+        '#00ffff',  # Cyan
+        '#bf00ff',  # Purple
+        '#ff00bf',  # Pink
+        '#00ff7f',  # Spring Green
+        '#ff7f00',  # Orange
+        '#7f00ff',  # Violet
+        '#ffff00',  # Yellow
+        '#00ff00',  # Lime
+        '#ff0000',  # Red
+        '#0080ff'   # Sky Blue
+    ]
+
+def create_animated_line_chart(df, x_col, y_col, title=""):
+    """Create an animated line chart with glow effect"""
+    fig = go.Figure()
     
-    def inject_custom_css(self):
-        """Inject custom CSS for professional styling"""
-        st.markdown("""
-        <style>
-        /* Import Google Fonts */
-        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap');
-        
-        /* Global Variables */
-        :root {
-            --primary-bg: #0a0b0f;
-            --secondary-bg: #1a1d23;
-            --tertiary-bg: #2a2d35;
-            --accent-color: #00d4ff;
-            --warning-color: #ff9500;
-            --danger-color: #ff3333;
-            --success-color: #00ff88;
-            --text-primary: #ffffff;
-            --text-secondary: #b0b3b8;
-            --border-color: #3a3d45;
+    fig.add_trace(go.Scatter(
+        x=df[x_col],
+        y=df[y_col],
+        mode='lines+markers',
+        line=dict(
+            color='#00ffff',
+            width=3,
+            shape='spline'
+        ),
+        marker=dict(
+            size=8,
+            color='#bf00ff',
+            line=dict(
+                color='#00ffff',
+                width=2
+            )
+        ),
+        fill='tozeroy',
+        fillcolor='rgba(0, 255, 255, 0.1)',
+        hovertemplate='<b>%{x}</b><br>Value: %{y}<extra></extra>'
+    ))
+    
+    layout = get_futuristic_plot_layout()
+    layout['title'] = title
+    layout['height'] = 400
+    
+    fig.update_layout(layout)
+    
+    return fig
+
+def create_3d_scatter(df, x_col, y_col, z_col, color_col=None, title=""):
+    """Create a 3D scatter plot with futuristic styling"""
+    fig = go.Figure()
+    
+    colors = df[color_col] if color_col else '#00ffff'
+    
+    fig.add_trace(go.Scatter3d(
+        x=df[x_col],
+        y=df[y_col],
+        z=df[z_col],
+        mode='markers',
+        marker=dict(
+            size=8,
+            color=colors,
+            colorscale=[[0, '#00ffff'], [0.5, '#bf00ff'], [1, '#ff00bf']],
+            opacity=0.8,
+            line=dict(color='white', width=0.5)
+        ),
+        text=df.index if hasattr(df, 'index') else None,
+        hovertemplate='<b>%{text}</b><br>X: %{x}<br>Y: %{y}<br>Z: %{z}<extra></extra>'
+    ))
+    
+    layout = get_futuristic_plot_layout()
+    layout['title'] = title
+    layout['scene'] = dict(
+        xaxis=dict(
+            backgroundcolor='rgba(20, 25, 47, 0.1)',
+            gridcolor='rgba(0, 255, 255, 0.1)',
+            showbackground=True,
+            zerolinecolor='rgba(0, 255, 255, 0.2)',
+        ),
+        yaxis=dict(
+            backgroundcolor='rgba(20, 25, 47, 0.1)',
+            gridcolor='rgba(191, 0, 255, 0.1)',
+            showbackground=True,
+            zerolinecolor='rgba(191, 0, 255, 0.2)',
+        ),
+        zaxis=dict(
+            backgroundcolor='rgba(20, 25, 47, 0.1)',
+            gridcolor='rgba(255, 0, 191, 0.1)',
+            showbackground=True,
+            zerolinecolor='rgba(255, 0, 191, 0.2)',
+        )
+    )
+    layout['height'] = 500
+    
+    fig.update_layout(layout)
+    
+    return fig
+
+def create_radar_chart(categories, values, title=""):
+    """Create a radar chart with neon styling"""
+    fig = go.Figure()
+    
+    fig.add_trace(go.Scatterpolar(
+        r=values,
+        theta=categories,
+        fill='toself',
+        line=dict(color='#ff00bf', width=2),
+        fillcolor='rgba(255, 0, 191, 0.2)',
+        marker=dict(
+            color='#ff00bf',
+            size=8,
+            line=dict(color='white', width=2)
+        ),
+        hovertemplate='<b>%{theta}</b><br>Value: %{r}<extra></extra>'
+    ))
+    
+    layout = get_futuristic_plot_layout()
+    layout['title'] = title
+    layout['polar'] = dict(
+        bgcolor='rgba(20, 25, 47, 0.1)',
+        radialaxis=dict(
+            gridcolor='rgba(0, 255, 255, 0.1)',
+            linecolor='rgba(0, 255, 255, 0.2)',
+            range=[0, max(values) * 1.2]
+        ),
+        angularaxis=dict(
+            gridcolor='rgba(191, 0, 255, 0.1)',
+            linecolor='rgba(191, 0, 255, 0.2)'
+        )
+    )
+    layout['height'] = 400
+    
+    fig.update_layout(layout)
+    
+    return fig
+
+def create_heatmap(data, x_labels, y_labels, title=""):
+    """Create a heatmap with futuristic color scheme"""
+    fig = go.Figure(data=go.Heatmap(
+        z=data,
+        x=x_labels,
+        y=y_labels,
+        colorscale=[[0, '#0a0e27'], [0.25, '#00ffff'], [0.5, '#bf00ff'], 
+                    [0.75, '#ff00bf'], [1, '#ffff00']],
+        hovertemplate='<b>%{y} - %{x}</b><br>Value: %{z}<extra></extra>',
+        colorbar=dict(
+            bgcolor='rgba(20, 25, 47, 0.7)',
+            bordercolor='#00ffff',
+            borderwidth=1,
+            tickfont=dict(color='#b8bcc8')
+        )
+    ))
+    
+    layout = get_futuristic_plot_layout()
+    layout['title'] = title
+    layout['height'] = 400
+    
+    fig.update_layout(layout)
+    
+    return fig
+
+def create_gauge_chart(value, max_value, title=""):
+    """Create a gauge chart with neon styling"""
+    fig = go.Figure(go.Indicator(
+        mode = "gauge+number+delta",
+        value = value,
+        domain = {'x': [0, 1], 'y': [0, 1]},
+        delta = {'reference': max_value * 0.5},
+        gauge = {
+            'axis': {'range': [None, max_value], 'tickcolor': "#b8bcc8"},
+            'bar': {'color': "#ff00bf"},
+            'bgcolor': "rgba(20, 25, 47, 0.3)",
+            'borderwidth': 2,
+            'bordercolor': "#00ffff",
+            'steps': [
+                {'range': [0, max_value * 0.25], 'color': 'rgba(0, 255, 255, 0.2)'},
+                {'range': [max_value * 0.25, max_value * 0.5], 'color': 'rgba(191, 0, 255, 0.2)'},
+                {'range': [max_value * 0.5, max_value * 0.75], 'color': 'rgba(255, 0, 191, 0.2)'},
+                {'range': [max_value * 0.75, max_value], 'color': 'rgba(255, 255, 0, 0.2)'}
+            ],
+            'threshold': {
+                'line': {'color': "white", 'width': 4},
+                'thickness': 0.75,
+                'value': max_value * 0.9
+            }
         }
-        
-        /* Main App Styling */
-        .stApp {
-            background: linear-gradient(135deg, var(--primary-bg) 0%, #0f1419 100%);
-            color: var(--text-primary);
-            font-family: 'Inter', sans-serif;
-        }
-        
-        /* Header Styling */
-        .main-header {
-            background: linear-gradient(135deg, var(--secondary-bg), var(--tertiary-bg));
-            border: 1px solid var(--border-color);
-            border-radius: 16px;
-            padding: 2rem;
-            margin-bottom: 2rem;
-            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
-        }
-        
-        .header-title {
-            font-size: 2.5rem;
-            font-weight: 800;
-            background: linear-gradient(135deg, var(--accent-color), #00a8cc);
-            -webkit-background-clip: text;
-            -webkit-text-fill-color: transparent;
-            background-clip: text;
-            margin-bottom: 0.5rem;
-        }
-        
-        .header-subtitle {
-            color: var(--text-secondary);
-            font-size: 1.1rem;
-            font-weight: 400;
-        }
-        
-        /* Metric Cards */
-        .metric-row {
-            display: grid;
-            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-            gap: 1.5rem;
-            margin: 2rem 0;
-        }
-        
-        .metric-card {
-            background: linear-gradient(135deg, var(--secondary-bg), var(--tertiary-bg));
-            border: 1px solid var(--border-color);
-            border-radius: 16px;
-            padding: 1.5rem;
-            text-align: center;
-            position: relative;
-            overflow: hidden;
-            transition: transform 0.3s ease, box-shadow 0.3s ease;
-        }
-        
-        .metric-card::before {
-            content: '';
-            position: absolute;
-            top: 0;
-            left: 0;
-            right: 0;
-            height: 4px;
-            background: linear-gradient(90deg, var(--accent-color), var(--success-color));
-        }
-        
-        .metric-card:hover {
-            transform: translateY(-4px);
-            box-shadow: 0 0 20px rgba(0, 212, 255, 0.2);
-        }
-        
-        .metric-value {
-            font-size: 3rem;
-            font-weight: 800;
-            color: var(--accent-color);
-            margin-bottom: 0.5rem;
-            line-height: 1;
-        }
-        
-        .metric-label {
-            color: var(--text-secondary);
-            font-size: 0.9rem;
-            font-weight: 600;
-            text-transform: uppercase;
-            letter-spacing: 0.5px;
-        }
-        
-        /* Chart Containers */
-        .chart-container {
-            background: var(--secondary-bg);
-            border: 1px solid var(--border-color);
-            border-radius: 16px;
-            padding: 1.5rem;
-            margin-bottom: 2rem;
-            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
-        }
-        
-        .chart-title {
-            font-size: 1.4rem;
-            font-weight: 700;
-            color: var(--text-primary);
-            margin-bottom: 1rem;
-            display: flex;
-            align-items: center;
-            gap: 0.5rem;
-        }
-        
-        .chart-icon {
-            width: 24px;
-            height: 24px;
-            background: var(--accent-color);
-            border-radius: 6px;
-            display: inline-block;
-        }
-        
-        /* Sidebar Styling */
-        .css-1d391kg {
-            background: var(--secondary-bg);
-            border-right: 1px solid var(--border-color);
-        }
-        
-        /* Filter Styling */
-        .filter-container {
-            background: var(--tertiary-bg);
-            border: 1px solid var(--border-color);
-            border-radius: 12px;
-            padding: 1.5rem;
-            margin: 1rem 0;
-        }
-        
-        /* Executive Summary */
-        .executive-summary {
-            background: linear-gradient(135deg, var(--secondary-bg), var(--tertiary-bg));
-            border: 1px solid var(--border-color);
-            border-radius: 16px;
-            padding: 2rem;
-            margin-bottom: 2rem;
-            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
-        }
-        
-        .summary-title {
-            font-size: 1.8rem;
-            font-weight: 700;
-            color: var(--accent-color);
-            margin-bottom: 1rem;
-        }
-        
-        .summary-text {
-            color: var(--text-secondary);
-            line-height: 1.6;
-            font-size: 1rem;
-        }
-        
-        /* Button Styling */
-        .stButton > button {
-            background: linear-gradient(135deg, var(--accent-color), #00a8cc);
-            border: none;
-            color: white;
-            font-weight: 600;
-            padding: 0.5rem 1.5rem;
-            border-radius: 8px;
-            transition: all 0.3s ease;
-        }
-        
-        .stButton > button:hover {
-            transform: translateY(-2px);
-            box-shadow: 0 8px 25px rgba(0, 212, 255, 0.3);
-        }
-        
-        /* Selectbox Styling */
-        .stSelectbox > div > div {
-            background: var(--tertiary-bg);
-            border: 1px solid var(--border-color);
-            color: var(--text-primary);
-        }
-        
-        /* Multiselect Styling */
-        .stMultiSelect > div > div {
-            background: var(--tertiary-bg);
-            border: 1px solid var(--border-color);
-        }
-        
-        /* DataFrame Styling */
-        .stDataFrame {
-            background: var(--secondary-bg);
-            border-radius: 12px;
-            overflow: hidden;
-        }
-        
-        /* Loading Animation */
-        .loading-animation {
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            height: 200px;
-        }
-        
-        .spinner {
-            width: 40px;
-            height: 40px;
-            border: 3px solid var(--border-color);
-            border-top: 3px solid var(--accent-color);
-            border-radius: 50%;
-            animation: spin 1s linear infinite;
-        }
-        
+    ))
+    
+    layout = get_futuristic_plot_layout()
+    layout['title'] = title
+    layout['height'] = 300
+    
+    fig.update_layout(layout)
+    
+    return fig
+
+def create_animated_bar_chart(df, x_col, y_col, title="", color_sequence=None):
+    """Create an animated bar chart with gradient colors"""
+    if color_sequence is None:
+        color_sequence = get_neon_color_palette()
+    
+    fig = go.Figure()
+    
+    fig.add_trace(go.Bar(
+        x=df[x_col],
+        y=df[y_col],
+        marker=dict(
+            color=df[y_col],
+            colorscale=[[0, '#00ffff'], [0.5, '#bf00ff'], [1, '#ff00bf']],
+            line=dict(color='rgba(255, 255, 255, 0.3)', width=1)
+        ),
+        hovertemplate='<b>%{x}</b><br>Value: %{y}<extra></extra>',
+        text=df[y_col],
+        textposition='outside',
+        textfont=dict(color='#00ffff', size=12)
+    ))
+    
+    layout = get_futuristic_plot_layout()
+    layout['title'] = title
+    layout['height'] = 400
+    layout['showlegend'] = False
+    
+    fig.update_layout(layout)
+    
+    return fig
+
+def create_donut_chart(labels, values, title=""):
+    """Create a donut chart with neon colors"""
+    colors = get_neon_color_palette()[:len(labels)]
+    
+    fig = go.Figure(data=[go.Pie(
+        labels=labels,
+        values=values,
+        hole=0.6,
+        marker=dict(
+            colors=colors,
+            line=dict(color='#0a0e27', width=2)
+        ),
+        textinfo='label+percent',
+        textfont=dict(color='#ffffff', size=12),
+        hovertemplate='<b>%{label}</b><br>Value: %{value}<br>Percent: %{percent}<extra></extra>'
+    )])
+    
+    # Add center text
+    fig.add_annotation(
+        text=title,
+        x=0.5, y=0.5,
+        font=dict(size=16, color='#00ffff', family="Orbitron, monospace"),
+        showarrow=False
+    )
+    
+    layout = get_futuristic_plot_layout()
+    layout['showlegend'] = True
+    layout['height'] = 400
+    
+    fig.update_layout(layout)
+    
+    return fig
+
+def create_treemap(labels, parents, values, title=""):
+    """Create a treemap with futuristic styling"""
+    fig = go.Figure(go.Treemap(
+        labels=labels,
+        parents=parents,
+        values=values,
+        marker=dict(
+            colorscale=[[0, '#0a0e27'], [0.33, '#00ffff'], 
+                       [0.66, '#bf00ff'], [1, '#ff00bf']],
+            line=dict(color='#0a0e27', width=2)
+        ),
+        textfont=dict(color='#ffffff', size=14, family="Orbitron, monospace"),
+        hovertemplate='<b>%{label}</b><br>Value: %{value}<extra></extra>'
+    ))
+    
+    layout = get_futuristic_plot_layout()
+    layout['title'] = title
+    layout['height'] = 500
+    
+    fig.update_layout(layout)
+    
+    return fig
+
+def create_loading_animation():
+    """Display a futuristic loading animation"""
+    loading_html = """
+    <div style="display: flex; justify-content: center; align-items: center; height: 200px;">
+        <div style="width: 60px; height: 60px; border: 3px solid rgba(0, 255, 255, 0.1);
+                    border-top: 3px solid #00ffff; border-radius: 50%;
+                    animation: spin 1s linear infinite;">
+        </div>
+    </div>
+    <style>
         @keyframes spin {
             0% { transform: rotate(0deg); }
             100% { transform: rotate(360deg); }
         }
-        
-        /* Mobile Responsiveness */
-        @media (max-width: 768px) {
-            .metric-row {
-                grid-template-columns: repeat(2, 1fr);
-            }
-            
-            .header-title {
-                font-size: 2rem;
-            }
-            
-            .metric-value {
-                font-size: 2rem;
-            }
-        }
-        
-        /* Custom Scrollbar */
-        ::-webkit-scrollbar {
-            width: 8px;
-        }
-        
-        ::-webkit-scrollbar-track {
-            background: var(--primary-bg);
-        }
-        
-        ::-webkit-scrollbar-thumb {
-            background: var(--accent-color);
-            border-radius: 4px;
-        }
-        </style>
-        """, unsafe_allow_html=True)
+    </style>
+    """
+    st.markdown(loading_html, unsafe_allow_html=True)
+
+def create_alert_box(message, alert_type="info"):
+    """Create a futuristic alert box"""
+    colors = {
+        "info": ("#00ffff", "rgba(0, 255, 255, 0.1)"),
+        "warning": ("#ff7f00", "rgba(255, 127, 0, 0.1)"),
+        "error": ("#ff0000", "rgba(255, 0, 0, 0.1)"),
+        "success": ("#00ff00", "rgba(0, 255, 0, 0.1)")
+    }
     
-    # ---------------- Header & Metrics ---------------- #
-    def render_main_header(self, title: str, subtitle: str = ""):
-        """Render the main dashboard header"""
-        st.markdown(f"""
-        <div class="main-header">
-            <h1 class="header-title">🛡️ {title}</h1>
-            {f'<p class="header-subtitle">{subtitle}</p>' if subtitle else ''}
-        </div>
-        """, unsafe_allow_html=True)
+    color, bg_color = colors.get(alert_type, colors["info"])
     
-    def render_metric_cards(self, metrics: dict):
-        """Render metric cards in a professional layout"""
-        cols = st.columns(len(metrics))
-        for i, (label, value) in enumerate(metrics.items()):
-            with cols[i]:
-                st.markdown(f"""
-                <div class="metric-card">
-                    <div class="metric-value">{value:,}</div>
-                    <div class="metric-label">{label}</div>
-                </div>
-                """, unsafe_allow_html=True)
+    alert_html = f"""
+    <div style="background: {bg_color}; border: 1px solid {color};
+                border-radius: 10px; padding: 15px; margin: 10px 0;
+                border-left: 4px solid {color};
+                box-shadow: 0 0 15px {bg_color};">
+        <p style="color: {color}; margin: 0; font-family: 'Orbitron', monospace;">
+            {message}
+        </p>
+    </div>
+    """
+    st.markdown(alert_html, unsafe_allow_html=True)
+
+def create_progress_bar(progress, label=""):
+    """Create a futuristic progress bar"""
+    progress = min(max(progress, 0), 100)  # Ensure progress is between 0 and 100
     
-    def render_executive_summary(self, summary_text: str, metrics: dict):
-        """Render executive summary section"""
-        st.markdown(f"""
-        <div class="executive-summary">
-            <div class="summary-text">{summary_text}</div>
-        </div>
-        """, unsafe_allow_html=True)
-        self.render_metric_cards(metrics)
-    
-    # ---------------- Globe ---------------- #
-    def create_professional_globe(self, country_data: dict, height: int = 400):
-        """Create a globe highlighting affected countries with borders"""
-        countries = list(country_data.keys())
-        try:
-            all_country_codes = [country.alpha_3 for country in pycountry.countries]
-        except:
-            all_country_codes = []
-        
-        affected_countries = []
-        for country in countries:
-            try:
-                code = pycountry.countries.lookup(country).alpha_3
-                affected_countries.append(code)
-            except:
-                continue
-        
-        z_data = []
-        locations = []
-        for code in all_country_codes:
-            locations.append(code)
-            z_data.append(1 if code in affected_countries else 0)
-        
-        fig = go.Figure(go.Choropleth(
-            locations=locations,
-            z=z_data,
-            colorscale=[[0, '#1a1d23'], [1, '#00d4ff']],
-            showscale=False,
-            marker_line_color='white',  # keep borders visible
-            marker_line_width=0.5,
-            hovertemplate='<b>%{location}</b><br>Status: %{customdata}<extra></extra>',
-            customdata=['Affected' if z == 1 else 'Not Affected' for z in z_data]
-        ))
-        
-        fig.update_geos(
-            projection_type="orthographic",
-            showcoastlines=True,
-            coastlinecolor="#00d4ff",
-            showland=True,
-            landcolor="#1a1d23",
-            showocean=True,
-            oceancolor="#0a0b0f",
-            showframe=False,
-            bgcolor="#0a0b0f"
-        )
-        
-        fig.update_layout(
-            paper_bgcolor='rgba(0,0,0,0)',
-            plot_bgcolor='rgba(0,0,0,0)',
-            font=dict(color='white'),
-            height=height,
-            margin=dict(t=10, b=10, l=10, r=10)
-        )
-        
-        return fig
-    
-    # ---------------- Charts ---------------- #
-    def create_professional_bar_chart(self, data: dict, title: str, orientation: str = "v"):
-        if orientation == "h":
-            fig = go.Figure(go.Bar(
-                y=list(data.keys()),
-                x=list(data.values()),
-                orientation='h',
-                marker=dict(
-                    color=list(data.values()),
-                    colorscale=[[0, '#2a2d35'], [0.5, '#00a8cc'], [1, '#00d4ff']],
-                    line=dict(color='#00d4ff', width=1)
-                ),
-                text=list(data.values()),
-                textposition='inside',
-                textfont=dict(color='white', size=12, family='Inter'),
-                hovertemplate='<b>%{y}</b><br>Count: %{x}<extra></extra>'
-            ))
-        else:
-            fig = go.Figure(go.Bar(
-                x=list(data.keys()),
-                y=list(data.values()),
-                marker=dict(
-                    color=list(data.values()),
-                    colorscale=[[0, '#2a2d35'], [0.5, '#00a8cc'], [1, '#00d4ff']],
-                    line=dict(color='#00d4ff', width=1)
-                ),
-                text=list(data.values()),
-                textposition='inside',
-                textfont=dict(color='white', size=12, family='Inter'),
-                hovertemplate='<b>%{x}</b><br>Count: %{y}<extra></extra>'
-            ))
-        fig.update_layout(
-            paper_bgcolor='rgba(0,0,0,0)',
-            plot_bgcolor='rgba(0,0,0,0)',
-            font=dict(color='white'),
-            xaxis=dict(gridcolor='#3a3d45', zerolinecolor='#3a3d45'),
-            yaxis=dict(gridcolor='#3a3d45', zerolinecolor='#3a3d45'),
-            margin=dict(t=20, b=40, l=40, r=40)
-        )
-        return fig
-    
-    def create_professional_heatmap(self, data: pd.DataFrame, x_col: str, y_col: str, value_col: str):
-        """Heatmap with zeros hidden and light grid"""
-        pivot_data = data.pivot(index=y_col, columns=x_col, values=value_col).fillna(0)
-        z_values = pivot_data.values.astype(float)
-        z_values[z_values == 0] = np.nan  # hide zeros
-        text_values = pivot_data.values.astype(int).astype(str)
-        text_values[z_values != z_values] = ""
-        
-        fig = go.Figure(go.Heatmap(
-            z=z_values,
-            x=list(pivot_data.columns),
-            y=list(pivot_data.index),
-            colorscale=[
-                [0, '#1a1d23'],
-                [0.2, '#2a2d35'],
-                [0.4, '#3a3d45'],
-                [0.6, '#00a8cc'],
-                [0.8, '#00d4ff'],
-                [1, '#00ff88']
-            ],
-            text=text_values,
-            texttemplate="%{text}",
-            textfont=dict(size=10, color="white", family='Inter'),
-            showscale=False,
-            hovertemplate=f'{x_col}: %{{x}}<br>{y_col}: %{{y}}<br>Count: %{{z}}<extra></extra>',
-            xgap=1,
-            ygap=1
-        ))
-        
-        fig.update_layout(
-            paper_bgcolor='rgba(0,0,0,0)',
-            plot_bgcolor='rgba(0,0,0,0)',
-            font=dict(color='white'),
-            xaxis=dict(gridcolor='rgba(255,255,255,0.1)', tickangle=-45, zeroline=False),
-            yaxis=dict(gridcolor='rgba(255,255,255,0.1)', zeroline=False),
-            margin=dict(t=20, b=80, l=150, r=20),
-            height=500
-        )
-        return fig
-    
-    def create_trend_chart(self, data: pd.DataFrame, x_col: str, y_col: str, category_col: str):
-        fig = go.Figure()
-        categories = data[category_col].unique()[:10]
-        colors = px.colors.qualitative.Set3
-        for i, category in enumerate(categories):
-            category_data = data[data[category_col] == category]
-            fig.add_trace(go.Scatter(
-                x=category_data[x_col],
-                y=category_data[y_col],
-                mode='lines+markers',
-                name=category,
-                line=dict(color=colors[i % len(colors)], width=3),
-                marker=dict(size=6)
-            ))
-        fig.update_layout(
-            paper_bgcolor='rgba(0,0,0,0)',
-            plot_bgcolor='rgba(0,0,0,0)',
-            font=dict(color='white'),
-            xaxis=dict(gridcolor='#3a3d45', zerolinecolor='#3a3d45'),
-            yaxis=dict(gridcolor='#3a3d45', zerolinecolor='#3a3d45'),
-            legend=dict(bgcolor='rgba(42, 45, 53, 0.8)', bordercolor='#3a3d45', font=dict(color='white')),
-            height=400,
-            margin=dict(t=20, b=40, l=40, r=40)
-        )
-        return fig
-    
-    # ---------------- Loading & Footer ---------------- #
-    def render_loading_spinner(self, message: str = "Loading..."):
-        st.markdown(f"""
-        <div class="loading-animation">
-            <div class="spinner"></div>
-            <span style="margin-left: 1rem; color: var(--text-secondary);">{message}</span>
-        </div>
-        """, unsafe_allow_html=True)
-    
-    def render_chart_container(self, title: str, chart_func, *args, **kwargs):
-        st.markdown(f"""
-        <div class="chart-container">
-            <h3 class="chart-title">
-                <span class="chart-icon"></span>
-                {title}
-            </h3>
-        </div>
-        """, unsafe_allow_html=True)
-        chart = chart_func(*args, **kwargs)
-        st.plotly_chart(chart, use_container_width=True)
-    
-    def create_download_button(self, df: pd.DataFrame, filename: str, label: str = "Download Data"):
-        output = BytesIO()
-        with pd.ExcelWriter(output, engine="openpyxl") as writer:
-            df.to_excel(writer, index=False, sheet_name="Data")
-        output.seek(0)
-        st.download_button(
-            label=f"📥 {label}",
-            data=output,
-            file_name=filename,
-            mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
-        )
-    
-    def render_footer(self):
-        st.markdown("""
-        <div style="margin-top: 3rem; padding: 2rem 0; border-top: 1px solid var(--border-color);">
-            <div style="text-align: center; color: var(--text-secondary); font-size: 0.9rem;">
-                <p>🛡️ <strong>Professional Threat Intelligence Dashboard</strong></p>
-                <p>Created with ❤️ by <a href="https://www.linkedin.com/in/ricardopinto110993/" target="_blank" 
-                   style="color: var(--accent-color); text-decoration: none;">Ricardo Mendes Pinto</a></p>
-                <p><em>Powered by Python, Streamlit & Advanced Analytics</em></p>
+    progress_html = f"""
+    <div style="margin: 20px 0;">
+        {f'<p style="color: #b8bcc8; margin-bottom: 10px; font-family: Orbitron, monospace;">{label}</p>' if label else ''}
+        <div style="background: rgba(20, 25, 47, 0.5); border: 1px solid rgba(0, 255, 255, 0.3);
+                    border-radius: 20px; height: 30px; position: relative; overflow: hidden;">
+            <div style="background: linear-gradient(90deg, #00ffff, #bf00ff, #ff00bf);
+                        height: 100%; width: {progress}%; border-radius: 20px;
+                        animation: pulse 2s ease-in-out infinite;
+                        box-shadow: 0 0 20px rgba(0, 255, 255, 0.5);
+                        transition: width 0.5s ease;">
+            </div>
+            <div style="position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);
+                        color: #ffffff; font-weight: bold; font-family: 'Orbitron', monospace;">
+                {progress}%
             </div>
         </div>
-        """, unsafe_allow_html=True)
+    </div>
+    <style>
+        @keyframes pulse {{
+            0%, 100% {{ opacity: 0.8; }}
+            50% {{ opacity: 1; }}
+        }}
+    </style>
+    """
+    st.markdown(progress_html, unsafe_allow_html=True)
+
+def create_data_table(df, max_rows=10):
+    """Create a futuristic styled data table"""
+    # Convert dataframe to HTML
+    table_html = df.head(max_rows).to_html(index=False, escape=False)
+    
+    # Apply futuristic styling
+    styled_table = f"""
+    <div style="overflow-x: auto; margin: 20px 0;">
+        <style>
+            .futuristic-table {{
+                width: 100%;
+                border-collapse: separate;
+                border-spacing: 0;
+                background: rgba(20, 25, 47, 0.7);
+                border: 1px solid rgba(0, 255, 255, 0.3);
+                border-radius: 10px;
+                overflow: hidden;
+                box-shadow: 0 0 20px rgba(0, 255, 255, 0.2);
+            }}
+            .futuristic-table thead {{
+                background: rgba(0, 255, 255, 0.1);
+            }}
+            .futuristic-table th {{
+                padding: 12px;
+                text-align: left;
+                color: #00ffff;
+                font-family: 'Orbitron', monospace;
+                text-transform: uppercase;
+                letter-spacing: 1px;
+                border-bottom: 2px solid rgba(0, 255, 255, 0.3);
+            }}
+            .futuristic-table td {{
+                padding: 10px;
+                color: #b8bcc8;
+                border-bottom: 1px solid rgba(191, 0, 255, 0.1);
+                font-family: monospace;
+            }}
+            .futuristic-table tr:hover {{
+                background: rgba(191, 0, 255, 0.1);
+                transition: background 0.3s ease;
+            }}
+            .futuristic-table tr:last-child td {{
+                border-bottom: none;
+            }}
+        </style>
+        {table_html.replace('<table', '<table class="futuristic-table"')}
+    </div>
+    """
+    st.markdown(styled_table, unsafe_allow_html=True)
+
+def create_sidebar_nav(options):
+    """Create a futuristic sidebar navigation"""
+    nav_html = """
+    <style>
+        .nav-link {
+            display: block;
+            padding: 12px 20px;
+            margin: 5px 0;
+            background: rgba(20, 25, 47, 0.7);
+            border: 1px solid rgba(0, 255, 255, 0.3);
+            border-radius: 10px;
+            color: #b8bcc8;
+            text-decoration: none;
+            transition: all 0.3s ease;
+            font-family: 'Orbitron', monospace;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+        .nav-link:hover {
+            background: rgba(0, 255, 255, 0.1);
+            border-color: #00ffff;
+            color: #00ffff;
+            transform: translateX(5px);
+            box-shadow: 0 0 15px rgba(0, 255, 255, 0.3);
+        }
+        .nav-link.active {
+            background: linear-gradient(45deg, rgba(0, 255, 255, 0.2), rgba(191, 0, 255, 0.2));
+            border-color: #bf00ff;
+            color: #bf00ff;
+        }
+    </style>
+    """
+    
+    st.sidebar.markdown(nav_html, unsafe_allow_html=True)
+    
+    selected = None
+    for option in options:
+        if st.sidebar.button(option, key=f"nav_{option}"):
+            selected = option
+    
+    return selected
+
+def create_kpi_dashboard(kpis):
+    """Create a KPI dashboard with futuristic cards
+    
+    Args:
+        kpis: List of dictionaries with keys: 'title', 'value', 'delta', 'icon'
+    """
+    cols = st.columns(len(kpis))
+    
+    for idx, (col, kpi) in enumerate(zip(cols, kpis)):
+        with col:
+            icon = kpi.get('icon', '📊')
+            delta = kpi.get('delta', None)
+            delta_color = 'success' if delta and delta > 0 else 'error' if delta and delta < 0 else 'normal'
+            
+            kpi_html = f"""
+            <div style="background: linear-gradient(135deg, rgba(20, 25, 47, 0.9), rgba(40, 45, 67, 0.7));
+                        border: 1px solid rgba(0, 255, 255, 0.3);
+                        border-radius: 15px; padding: 20px; text-align: center;
+                        min-height: 180px; position: relative; overflow: hidden;
+                        transition: all 0.3s ease; cursor: pointer;"
+                 onmouseover="this.style.transform='translateY(-10px) scale(1.02)'; this.style.borderColor='#00ffff'; this.style.boxShadow='0 20px 40px rgba(0, 255, 255, 0.4)';"
+                 onmouseout="this.style.transform='translateY(0) scale(1)'; this.style.borderColor='rgba(0, 255, 255, 0.3)'; this.style.boxShadow='none';">
+                
+                <!-- Background animation -->
+                <div style="position: absolute; top: -50%; right: -50%; width: 200%; height: 200%;
+                            background: radial-gradient(circle, rgba(191, 0, 255, 0.1) 0%, transparent 70%);
+                            animation: rotate 10s linear infinite;">
+                </div>
+                
+                <!-- Content -->
+                <div style="position: relative; z-index: 1;">
+                    <div style="font-size: 2em; margin-bottom: 10px;">{icon}</div>
+                    <div style="color: #b8bcc8; font-size: 0.9em; text-transform: uppercase;
+                                letter-spacing: 1px; margin-bottom: 10px; font-family: 'Orbitron', monospace;">
+                        {kpi['title']}
+                    </div>
+                    <div style="font-size: 2.5em; font-weight: bold; font-family: 'Orbitron', monospace;
+                                background: linear-gradient(45deg, #00ffff, #ff00bf);
+                                -webkit-background-clip: text; -webkit-text-fill-color: transparent;">
+                        {kpi['value']}
+                    </div>
+            """
+            
+            if delta is not None:
+                arrow = "↑" if delta > 0 else "↓" if delta < 0 else "→"
+                color = "#00ff00" if delta > 0 else "#ff0000" if delta < 0 else "#ffff00"
+                kpi_html += f"""
+                    <div style="color: {color}; margin-top: 10px; font-size: 1.1em;
+                                font-family: 'Orbitron', monospace;">
+                        {arrow} {abs(delta)}%
+                    </div>
+                """
+            
+            kpi_html += """
+                </div>
+            </div>
+            <style>
+                @keyframes rotate {
+                    from { transform: rotate(0deg); }
+                    to { transform: rotate(360deg); }
+                }
+            </style>
+            """
+            
+            st.markdown(kpi_html, unsafe_allow_html=True)
+
+def create_timeline(events):
+    """Create a futuristic timeline
+    
+    Args:
+        events: List of dictionaries with keys: 'date', 'title', 'description'
+    """
+    timeline_html = """
+    <div style="position: relative; padding: 20px;">
+        <div style="position: absolute; left: 50%; top: 0; bottom: 0;
+                    width: 2px; background: linear-gradient(180deg, #00ffff, #bf00ff, #ff00bf);
+                    box-shadow: 0 0 10px rgba(0, 255, 255, 0.5);">
+        </div>
+    """
+    
+    for idx, event in enumerate(events):
+        side = "left" if idx % 2 == 0 else "right"
+        margin = "0 55% 30px 0" if side == "left" else "0 0 30px 55%"
+        
+        timeline_html += f"""
+        <div style="margin: {margin}; position: relative;">
+            <div style="background: rgba(20, 25, 47, 0.8); border: 1px solid rgba(0, 255, 255, 0.3);
+                        border-radius: 10px; padding: 15px; transition: all 0.3s ease;"
+                 onmouseover="this.style.transform='scale(1.05)'; this.style.borderColor='#00ffff'; this.style.boxShadow='0 0 20px rgba(0, 255, 255, 0.4)';"
+                 onmouseout="this.style.transform='scale(1)'; this.style.borderColor='rgba(0, 255, 255, 0.3)'; this.style.boxShadow='none';">
+                <div style="color: #00ffff; font-weight: bold; margin-bottom: 5px;
+                            font-family: 'Orbitron', monospace;">
+                    {event['date']}
+                </div>
+                <div style="color: #bf00ff; font-weight: bold; margin-bottom: 5px;
+                            font-family: 'Orbitron', monospace; text-transform: uppercase;">
+                    {event['title']}
+                </div>
+                <div style="color: #b8bcc8; font-size: 0.9em;">
+                    {event['description']}
+                </div>
+            </div>
+            <div style="position: absolute; {'right' if side == 'left' else 'left'}: -8px;
+                        top: 20px; width: 12px; height: 12px;
+                        background: radial-gradient(circle, #ff00bf, #bf00ff);
+                        border: 2px solid #00ffff; border-radius: 50%;
+                        box-shadow: 0 0 10px rgba(255, 0, 191, 0.5);">
+            </div>
+        </div>
+        """
+    
+    timeline_html += "</div>"
+    st.markdown(timeline_html, unsafe_allow_html=True)
+
+def create_glowing_button(label, key=None):
+    """Create a glowing button with futuristic styling"""
+    button_html = f"""
+    <button style="background: linear-gradient(45deg, #00ffff, #bf00ff);
+                   color: white; border: none; border-radius: 25px;
+                   padding: 12px 30px; font-size: 16px; font-weight: bold;
+                   font-family: 'Orbitron', monospace; text-transform: uppercase;
+                   letter-spacing: 2px; cursor: pointer; position: relative;
+                   overflow: hidden; transition: all 0.3s ease;
+                   box-shadow: 0 4px 15px rgba(0, 255, 255, 0.4);"
+            onmouseover="this.style.transform='translateY(-3px)'; this.style.boxShadow='0 6px 25px rgba(191, 0, 255, 0.5)';"
+            onmouseout="this.style.transform='translateY(0)'; this.style.boxShadow='0 4px 15px rgba(0, 255, 255, 0.4)';">
+        <span style="position: relative; z-index: 1;">{label}</span>
+        <div style="position: absolute; top: -50%; left: -50%; width: 200%; height: 200%;
+                    background: radial-gradient(circle, rgba(255, 255, 255, 0.3) 0%, transparent 70%);
+                    animation: shimmer 3s infinite;">
+        </div>
+    </button>
+    <style>
+        @keyframes shimmer {{
+            0% {{ transform: rotate(0deg); opacity: 0; }}
+            50% {{ opacity: 1; }}
+            100% {{ transform: rotate(360deg); opacity: 0; }}
+        }}
+    </style>
+    """
+    
+    if st.markdown(button_html, unsafe_allow_html=True):
+        return True
+    return False
