@@ -1,48 +1,45 @@
 # File: requirements.txt
 # ===========================
-#Requirements file for Threat Intelligence System
+# Requirements file for Threat Intelligence System
 
 # Core dependencies
-streamlit>=1.28.0
-pandas>=2.0.0
-numpy>=1.24.0
-requests>=2.31.0
-beautifulsoup4>=4.12.0
-feedparser>=6.0.10
+streamlit==1.49.1
+pandas==2.3.2
+numpy==2.3.3
+requests==2.32.5
+beautifulsoup4==4.13.5
+feedparser==6.0.12
 
 # Visualization
-plotly>=5.17.0
-matplotlib>=3.7.0
+plotly==6.3.0
+matplotlib==3.10.6
 
 # Data processing
-openpyxl>=3.1.0
-xlsxwriter>=3.1.0
-python-dateutil>=2.8.2
+openpyxl==3.1.5
+xlsxwriter==3.2.9
+python-dateutil==2.9.0.post0
 
 # Country detection
-pycountry>=23.12.0
-tldextract>=5.0.0
-geoip2>=4.7.0
+pycountry==24.6.1
+tldextract==5.3.0
+geoip2==5.1.0
 
 # NLP (optional)
-spacy>=3.7.0
-
-# Database
-sqlite3  # Built-in with Python
+spacy==3.8.7
 
 # OTX Integration
-OTXv2>=1.5.12
+OTXv2==1.5.12
 
 # Utilities
-pyyaml>=6.0.1
-python-dotenv>=1.0.0
-schedule>=1.2.0
-unicodedata2>=15.1.0
+pyyaml==6.0.2
+python-dotenv==1.0.1
+schedule==1.2.2
+unicodedata2==15.1.0
 
 # Testing (optional)
-pytest>=7.4.0
-pytest-cov>=4.1.0
+pytest==7.4.4
+pytest-cov==4.1.0
 
 # Development (optional)
-black>=23.0.0
-flake
+black==24.4.2
+flake8==7.1.1
