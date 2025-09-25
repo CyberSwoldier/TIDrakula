@@ -20,7 +20,7 @@ from typing import Dict, List, Tuple
 # Page configuration
 st.set_page_config(
     page_title="Threat Intelligence Platform - TIP",
-    page_icon="🛡️",
+    page_icon="🧛",
     layout="wide",
     initial_sidebar_state="expanded"
 )
