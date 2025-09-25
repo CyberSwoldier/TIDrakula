@@ -1834,16 +1834,16 @@ def main():
 
     # Tab 3: Intelligence Analysis
     with main_tabs[3]:
-        if not is_premium:
-            st.markdown("""
-            <div style="padding: 40px; background: rgba(20, 25, 47, 0.95);
-                    border: 2px solid gold; border-radius: 20px; text-align: center;">
-                <h2>🔒 Premium Feature</h2>
-                <p>This feature requires a Premium subscription</p>
-                <p>Contact admin to upgrade your account</p>
-            </div>
-            """, unsafe_allow_html=True)
-        else:
+       # if not is_premium:
+        #    st.markdown("""
+         #   <div style="padding: 40px; background: rgba(20, 25, 47, 0.95);
+          #          border: 2px solid gold; border-radius: 20px; text-align: center;">
+           #     <h2>🔒 Premium Feature</h2>
+            #    <p>This feature requires a Premium subscription</p>
+             #   <p>Contact admin to upgrade your account</p>
+            #</div>
+            #""", unsafe_allow_html=True)
+        #else:
     
         
          if not threat_df.empty:
