@@ -3,13 +3,7 @@
 Advanced Threat Intelligence Platform with Enhanced Interactivity
 Auto-updating feeds every 5 minutes with comprehensive filtering and drill-down capabilities
 """
-import os
-from supabase import create_client, Client
-from dotenv import load_dotenv
-import sqlite3
-import bcrypt
-import secrets
-import re
+
 import streamlit as st
 import pandas as pd
 import numpy as np
@@ -26,192 +20,10 @@ from typing import Dict, List, Tuple
 # Page configuration
 st.set_page_config(
     page_title="Threat Intelligence Platform - TIP",
-    page_icon="🛡️",
+    page_icon="🧛",
     layout="wide",
     initial_sidebar_state="expanded"
 )
-
-
-# ============================================================================
-# SUPABASE AUTHENTICATION SYSTEM
-# ============================================================================
-
-# Load environment variables
-load_dotenv()
-
-# Initialize Supabase client
-try:
-    supabase: Client = create_client(
-        os.getenv("https://zyoonimgezivevnxfqep.supabase.co") or st.secrets.get("https://zyoonimgezivevnxfqep.supabase.co", ""),
-        os.getenv("eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inp5b29uaW1nZXppdmV2bnhmcWVwIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTg3OTkxNDYsImV4cCI6MjA3NDM3NTE0Nn0.ecZ4TMGsDHvAK02oP8P-IUWlpNOUmKEv8RUm-N1ClQQ") or st.secrets.get("eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inp5b29uaW1nZXppdmV2bnhmcWVwIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTg3OTkxNDYsImV4cCI6MjA3NDM3NTE0Nn0.ecZ4TMGsDHvAK02oP8P-IUWlpNOUmKEv8RUm-N1ClQQ", "")
-    )
-except:
-    st.error("Please configure Supabase credentials")
-    st.stop()
-
-def create_user(email, password, username, full_name="", company=""):
-    """Create a new user with Supabase Auth"""
-    try:
-        auth_response = supabase.auth.sign_up({
-            "email": email,
-            "password": password
-        })
-        
-        if auth_response.user:
-            profile_response = supabase.table('user_profiles').insert({
-                'id': auth_response.user.id,
-                'username': username,
-                'full_name': full_name,
-                'company': company,
-                'role': 'free',
-                'is_premium': False
-            }).execute()
-            
-            return True, "Account created! Check your email to verify."
-        else:
-            return False, "Failed to create account"
-            
-    except Exception as e:
-        error_msg = str(e)
-        if "already registered" in error_msg.lower():
-            return False, "Email already registered"
-        else:
-            return False, f"Registration failed: {error_msg}"
-
-def verify_user(email, password):
-    """Sign in user with Supabase Auth"""
-    try:
-        auth_response = supabase.auth.sign_in_with_password({
-            "email": email,
-            "password": password
-        })
-        
-        if auth_response.user:
-            profile_response = supabase.table('user_profiles').select("*").eq('id', auth_response.user.id).single().execute()
-            
-            if profile_response.data:
-                profile = profile_response.data
-                return {
-                    'id': auth_response.user.id,
-                    'email': email,
-                    'username': profile.get('username', email.split('@')[0]),
-                    'full_name': profile.get('full_name', ''),
-                    'company': profile.get('company', ''),
-                    'role': profile.get('role', 'free'),
-                    'is_premium': profile.get('is_premium', False)
-                }
-            else:
-                username = email.split('@')[0]
-                supabase.table('user_profiles').insert({
-                    'id': auth_response.user.id,
-                    'username': username,
-                    'role': 'free',
-                    'is_premium': False
-                }).execute()
-                
-                return {
-                    'id': auth_response.user.id,
-                    'email': email,
-                    'username': username,
-                    'role': 'free',
-                    'is_premium': False
-                }
-        return None
-            
-    except Exception as e:
-        return None
-
-def validate_email(email):
-    pattern = r'^[\w\.-]+@[\w\.-]+\.\w+$'
-    return re.match(pattern, email) is not None
-
-def validate_password(password):
-    if len(password) < 6:
-        return False, "Password must be at least 6 characters"
-    return True, "Password is valid"
-
-def show_login_page():
-    """Display login and registration page"""
-    apply_futuristic_theme()
-    
-    st.markdown("""
-    <div style="text-align: center; padding: 30px; background: rgba(20, 25, 47, 0.9);
-                border-radius: 20px; border: 2px solid #00ffff; margin-bottom: 30px;">
-        <h1 style="margin: 0;"> THREAT INTELLIGENCE PLATFORM</h1>
-        <p style="color: #b8bcc8;">Secure Cloud Access Portal</p>
-    </div>
-    """, unsafe_allow_html=True)
-    
-    tab1, tab2 = st.tabs(["🔐 Login", "📝 Register"])
-    
-    with tab1:
-        st.markdown("### Welcome Back")
-        
-        with st.form("login_form"):
-            email = st.text_input("Email", placeholder="your@email.com")
-            password = st.text_input("Password", type="password")
-            
-            submit = st.form_submit_button("LOGIN", type="primary")
-            
-            if submit:
-                if email and password:
-                    with st.spinner("Authenticating..."):
-                        user = verify_user(email, password)
-                        if user:
-                            st.session_state.authenticated = True
-                            st.session_state.user = user
-                            st.success(f"Welcome, {user['username']}!")
-                            time.sleep(1)
-                            st.rerun()
-                        else:
-                            st.error("Invalid credentials")
-                else:
-                    st.error("Enter email and password")
-    
-    with tab2:
-        st.markdown("### Create Account")
-        
-        with st.form("register_form"):
-            col1, col2 = st.columns(2)
-            
-            with col1:
-                reg_name = st.text_input("Full Name")
-                reg_email = st.text_input("Email")
-                reg_username = st.text_input("Username")
-            
-            with col2:
-                reg_company = st.text_input("Company (Optional)")
-                reg_password = st.text_input("Password", type="password")
-                reg_password2 = st.text_input("Confirm Password", type="password")
-            
-            terms = st.checkbox("I agree to Terms of Service")
-            
-            register = st.form_submit_button("REGISTER", type="primary")
-            
-            if register:
-                if not all([reg_name, reg_email, reg_username, reg_password]):
-                    st.error("Fill all required fields")
-                elif not validate_email(reg_email):
-                    st.error("Invalid email")
-                elif reg_password != reg_password2:
-                    st.error("Passwords don't match")
-                else:
-                    is_valid, msg = validate_password(reg_password)
-                    if not is_valid:
-                        st.error(msg)
-                    elif not terms:
-                        st.error("Accept Terms")
-                    else:
-                        with st.spinner("Creating account..."):
-                            success, message = create_user(
-                                reg_email, reg_password, reg_username, 
-                                reg_name, reg_company
-                            )
-                            if success:
-                                st.success(message)
-                            else:
-                                st.error(message)
-
 
 # ============================================================================
 # FUTURISTIC THEME STYLING
@@ -1160,86 +972,11 @@ def show_threat_details_popup(threats_df, filter_type='all'):
                 height=400
             )
 
-
-# MAIN FUNCTION ----------------------
+# ============================================================================
+# MAIN APPLICATION
+# ============================================================================
 
 def main():
-    # Initialize session state
-    if 'authenticated' not in st.session_state:
-        st.session_state.authenticated = False
-    if 'user' not in st.session_state:
-        st.session_state.user = None
-    
-    # Check authentication
-    if not st.session_state.authenticated:
-        show_login_page()
-        return
-    
-    # User is authenticated - show dashboard
-    apply_futuristic_theme()
-    initialize_auto_update()
-    
-    # Get user info
-    user = st.session_state.user
-    is_premium = user.get('is_premium', False)
-    
-    # Initialize session state
-    if 'threat_data' not in st.session_state:
-        st.session_state.threat_data = ThreatIntelligence.generate_threat_feed(1000)
-    
-    # Auto-update check (every 5 minutes)
-    if check_auto_update():
-        new_threats = ThreatIntelligence.generate_threat_feed(10)
-        st.session_state.threat_data = pd.concat([new_threats, st.session_state.threat_data]).reset_index(drop=True)
-        st.session_state.threat_data = st.session_state.threat_data.head(1000)
-    
-    # Calculate time until next update
-    seconds_since_update = (datetime.now() - st.session_state.last_update).total_seconds()
-    seconds_until_next = 300 - seconds_since_update
-    minutes_until_next = int(seconds_until_next // 60)
-    seconds_remainder = int(seconds_until_next % 60)
-    
-    # Header with user info and logout
-    col1, col2, col3 = st.columns([6, 2, 1])
-    
-    with col1:
-        st.markdown(f"""
-        <div style="text-align: center; padding: 30px; background: rgba(20, 25, 47, 0.7); 
-                    backdrop-filter: blur(20px); border-radius: 20px; 
-                    border: 2px solid rgba(0, 255, 255, 0.3); margin-bottom: 30px;
-                    box-shadow: 0 0 40px rgba(0, 255, 255, 0.2);">
-            <h1 style="margin: 0;">THREAT INTELLIGENCE PLATFORM</h1>
-            <p style="color: #b8bcc8; font-size: 1.1em; margin-top: 10px; letter-spacing: 2px;">
-                REAL-TIME THREAT DETECTION • AUTO-UPDATING FEEDS • PREDICTIVE ANALYTICS
-            </p>
-            <p style="color: #00ff00; font-size: 0.9em; margin-top: 5px;">
-                🟢 FEEDS AUTO-UPDATE EVERY 5 MINUTES | Last Update: {st.session_state.last_update.strftime('%H:%M:%S')} | 
-                Next Update in: {minutes_until_next}m {seconds_remainder}s
-            </p>
-        </div>
-        """, unsafe_allow_html=True)
-    
-    with col2:
-        st.markdown(f"""
-        <div style="padding: 15px; background: rgba(20, 25, 47, 0.8); 
-                    border-radius: 10px; border: 1px solid #00ffff; text-align: center;">
-            <p style="margin: 0; color: #00ffff;">👤 {user['username']}</p>
-            <p style="margin: 0; color: {'gold' if is_premium else '#b8bcc8'}; font-size: 0.9em;">
-                {'⭐ PREMIUM' if is_premium else '🆓 FREE'}
-            </p>
-        </div>
-        """, unsafe_allow_html=True)
-    
-    with col3:
-        if st.button("🚪 Logout", use_container_width=True):
-            supabase.auth.sign_out()
-            st.session_state.authenticated = False
-            st.session_state.user = None
-            st.rerun()
-    
-    # REST OF YOUR EXISTING CODE CONTINUES HERE (Sidebar and all tabs)
-    # The entire sidebar code and tabs code remains exactly the same
-
     apply_futuristic_theme()
     initialize_auto_update()
     
@@ -1710,19 +1447,9 @@ def main():
 
     # Tab 3: Intelligence Analysis
     with main_tabs[3]:
-        if not is_premium:
-            st.markdown("""
-            <div style="padding: 40px; background: rgba(20, 25, 47, 0.95);
-                    border: 2px solid gold; border-radius: 20px; text-align: center;">
-                <h2>🔒 Premium Feature</h2>
-                <p>This feature requires a Premium subscription</p>
-                <p>Contact admin to upgrade your account</p>
-            </div>
-            """, unsafe_allow_html=True)
-        else:
-    
+        st.markdown("### 🔬 THREAT INTELLIGENCE ANALYSIS")
         
-         if not threat_df.empty:
+        if not threat_df.empty:
             anal_col1, anal_col2 = st.columns(2)
             
             with anal_col1:
@@ -1787,7 +1514,7 @@ def main():
                             st.markdown("**Target Sectors:**")
                             for sector, count in target_sectors.items():
                                 st.markdown(f"• {sector}: {count}")
-         else:
+        else:
             st.info("No threat data available with current filters")
 
     # Tab 3: Human-Targeted Attacks
