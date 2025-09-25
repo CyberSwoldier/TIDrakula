@@ -1,2 +1,5 @@
 .env
 secrets.toml
+.env
+.env.local
+*.db
