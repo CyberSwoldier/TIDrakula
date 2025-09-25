@@ -23,37 +23,33 @@ import json
 import feedparser
 from typing import Dict, List, Tuple
 from supabase import create_client, Client
-
-
-
+import streamlit as st
+import re
+import time
 
 # ============================================================================
 # SUPABASE AUTHENTICATION SYSTEM
 # ============================================================================
 
-# Load environment variables
-load_dotenv()
-
-# Initialize Supabase client
+# Initialize Supabase client after Streamlit secrets are loaded
 @st.cache_resource
 def get_supabase_client() -> Client:
-    url = st.secrets["SUPABASE_URL"]  # exactly the key in your secrets
-    key = st.secrets["SUPABASE_KEY"]  # exactly the key in your secrets
+    url = st.secrets["SUPABASE_URL"]  # key must exactly match your secrets.toml
+    key = st.secrets["SUPABASE_KEY"]
     return create_client(url, key)
 
-# Create the client at runtime
 supabase = get_supabase_client()
+
+# ----------------------
+# User Management
+# ----------------------
 
 def create_user(email, password, username, full_name="", company=""):
     """Create a new user with Supabase Auth"""
     try:
-        auth_response = supabase.auth.sign_up({
-            "email": email,
-            "password": password
-        })
-        
+        auth_response = supabase.auth.sign_up({"email": email, "password": password})
         if auth_response.user:
-            profile_response = supabase.table('user_profiles').insert({
+            supabase.table('user_profiles').insert({
                 'id': auth_response.user.id,
                 'username': username,
                 'full_name': full_name,
@@ -61,74 +57,55 @@ def create_user(email, password, username, full_name="", company=""):
                 'role': 'free',
                 'is_premium': False
             }).execute()
-            
             return True, "Account created! Check your email to verify."
         else:
             return False, "Failed to create account"
-            
     except Exception as e:
-        error_msg = str(e)
-        if "already registered" in error_msg.lower():
+        if "already registered" in str(e).lower():
             return False, "Email already registered"
-        else:
-            return False, f"Registration failed: {error_msg}"
+        return False, f"Registration failed: {str(e)}"
 
 def verify_user(email, password):
     """Sign in user with Supabase Auth"""
     try:
-        auth_response = supabase.auth.sign_in_with_password({
-            "email": email,
-            "password": password
-        })
-        
-        if auth_response.user:
-            profile_response = supabase.table('user_profiles').select("*").eq('id', auth_response.user.id).single().execute()
-            
-            if profile_response.data:
-                profile = profile_response.data
-                return {
-                    'id': auth_response.user.id,
-                    'email': email,
-                    'username': profile.get('username', email.split('@')[0]),
-                    'full_name': profile.get('full_name', ''),
-                    'company': profile.get('company', ''),
-                    'role': profile.get('role', 'free'),
-                    'is_premium': profile.get('is_premium', False)
-                }
-            else:
-                username = email.split('@')[0]
-                supabase.table('user_profiles').insert({
-                    'id': auth_response.user.id,
-                    'username': username,
-                    'role': 'free',
-                    'is_premium': False
-                }).execute()
-                
-                return {
-                    'id': auth_response.user.id,
-                    'email': email,
-                    'username': username,
-                    'role': 'free',
-                    'is_premium': False
-                }
-        return None
-            
-    except Exception as e:
+        auth_response = supabase.auth.sign_in_with_password({"email": email, "password": password})
+        if not auth_response.user:
+            return None
+
+        profile_resp = supabase.table('user_profiles').select("*").eq('id', auth_response.user.id).single().execute()
+        profile = profile_resp.data if profile_resp.data else {}
+        username = profile.get('username', email.split('@')[0])
+        return {
+            'id': auth_response.user.id,
+            'email': email,
+            'username': username,
+            'full_name': profile.get('full_name', ''),
+            'company': profile.get('company', ''),
+            'role': profile.get('role', 'free'),
+            'is_premium': profile.get('is_premium', False)
+        }
+    except Exception:
         return None
 
+# ----------------------
+# Validation
+# ----------------------
+
 def validate_email(email):
-    pattern = r'^[\w\.-]+@[\w\.-]+\.\w+$'
-    return re.match(pattern, email) is not None
+    return re.match(r'^[\w\.-]+@[\w\.-]+\.\w+$', email) is not None
 
 def validate_password(password):
     if len(password) < 6:
         return False, "Password must be at least 6 characters"
     return True, "Password is valid"
 
+# ----------------------
+# Streamlit Login/Register Page
+# ----------------------
+
 def show_login_page():
-    """Display login and registration page"""
-    apply_futuristic_theme()
-    
+    apply_futuristic_theme()  # your custom theme function
+
     st.markdown("""
     <div style="text-align: center; padding: 30px; background: rgba(20, 25, 47, 0.9);
                 border-radius: 20px; border: 2px solid #00ffff; margin-bottom: 30px;">
@@ -136,18 +113,17 @@ def show_login_page():
         <p style="color: #b8bcc8;">Secure Cloud Access Portal</p>
     </div>
     """, unsafe_allow_html=True)
-    
+
     tab1, tab2 = st.tabs(["🔐 Login", "📝 Register"])
-    
+
+    # Login tab
     with tab1:
         st.markdown("### Welcome Back")
-        
         with st.form("login_form"):
             email = st.text_input("Email", placeholder="your@email.com")
             password = st.text_input("Password", type="password")
-            
             submit = st.form_submit_button("LOGIN", type="primary")
-            
+
             if submit:
                 if email and password:
                     with st.spinner("Authenticating..."):
@@ -162,27 +138,23 @@ def show_login_page():
                             st.error("Invalid credentials")
                 else:
                     st.error("Enter email and password")
-    
+
+    # Register tab
     with tab2:
         st.markdown("### Create Account")
-        
         with st.form("register_form"):
             col1, col2 = st.columns(2)
-            
             with col1:
                 reg_name = st.text_input("Full Name")
                 reg_email = st.text_input("Email")
                 reg_username = st.text_input("Username")
-            
             with col2:
                 reg_company = st.text_input("Company (Optional)")
                 reg_password = st.text_input("Password", type="password")
                 reg_password2 = st.text_input("Confirm Password", type="password")
-            
             terms = st.checkbox("I agree to Terms of Service")
-            
             register = st.form_submit_button("REGISTER", type="primary")
-            
+
             if register:
                 if not all([reg_name, reg_email, reg_username, reg_password]):
                     st.error("Fill all required fields")
@@ -207,7 +179,10 @@ def show_login_page():
                             else:
                                 st.error(message)
 
-# Page configuration
+# ----------------------
+# Page Config
+# ----------------------
+
 st.set_page_config(
     page_title="Threat Intelligence Platform - TIP",
     page_icon="🛡️",
