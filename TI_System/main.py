@@ -34,8 +34,8 @@ import time
 # Initialize Supabase client after Streamlit secrets are loaded
 @st.cache_resource
 def get_supabase_client() -> Client:
-    url = st.secrets["https://zyoonimgezivevnxfqep.supabase.co"]  # key must exactly match your secrets.toml
-    key = st.secrets["eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inp5b29uaW1nZXppdmV2bnhmcWVwIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NTg3OTkxNDYsImV4cCI6MjA3NDM3NTE0Nn0.ecZ4TMGsDHvAK02oP8P-IUWlpNOUmKEv8RUm-N1ClQQ"]
+    url = st.secrets["SUPABASE_URL"]  # key must exactly match your secrets.toml
+    key = st.secrets["SUPABASE_KEY"]
     return create_client(url, key)
 
 supabase = get_supabase_client()
