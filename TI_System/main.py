@@ -3,10 +3,7 @@
 Advanced Threat Intelligence Platform with Enhanced Interactivity
 Auto-updating feeds every 5 minutes with comprehensive filtering and drill-down capabilities
 """
-import sqlite3
-import bcrypt
-import secrets
-import re
+
 import streamlit as st
 import pandas as pd
 import numpy as np
@@ -27,190 +24,6 @@ st.set_page_config(
     layout="wide",
     initial_sidebar_state="expanded"
 )
-
-
-# ============================================================================
-# AUTHENTICATION SYSTEM
-# ============================================================================
-
-def init_database():
-    """Initialize SQLite database for users"""
-    conn = sqlite3.connect('users.db')
-    cursor = conn.cursor()
-    
-    cursor.execute('''
-        CREATE TABLE IF NOT EXISTS users (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            email TEXT UNIQUE NOT NULL,
-            username TEXT UNIQUE NOT NULL,
-            password_hash TEXT NOT NULL,
-            full_name TEXT,
-            company TEXT,
-            role TEXT DEFAULT 'free',
-            is_premium BOOLEAN DEFAULT 0,
-            created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-            last_login TIMESTAMP
-        )
-    ''')
-    
-    conn.commit()
-    conn.close()
-
-def create_user(email, username, password, full_name="", company=""):
-    """Create a new user account"""
-    conn = sqlite3.connect('users.db')
-    cursor = conn.cursor()
-    
-    try:
-        password_hash = bcrypt.hashpw(password.encode('utf-8'), bcrypt.gensalt()).decode('utf-8')
-        
-        cursor.execute('''
-            INSERT INTO users (email, username, password_hash, full_name, company)
-            VALUES (?, ?, ?, ?, ?)
-        ''', (email, username, password_hash, full_name, company))
-        
-        conn.commit()
-        conn.close()
-        return True, "Account created successfully!"
-        
-    except sqlite3.IntegrityError as e:
-        conn.close()
-        if "email" in str(e):
-            return False, "Email already registered"
-        elif "username" in str(e):
-            return False, "Username already taken"
-        else:
-            return False, "Registration failed"
-
-def verify_user(email, password):
-    """Verify user login credentials"""
-    conn = sqlite3.connect('users.db')
-    cursor = conn.cursor()
-    
-    cursor.execute('''
-        SELECT id, username, password_hash, full_name, company, role, is_premium
-        FROM users WHERE email = ?
-    ''', (email,))
-    
-    user = cursor.fetchone()
-    
-    if user and bcrypt.checkpw(password.encode('utf-8'), user[2].encode('utf-8')):
-        cursor.execute('UPDATE users SET last_login = ? WHERE id = ?', 
-                      (datetime.now(), user[0]))
-        conn.commit()
-        conn.close()
-        
-        return {
-            'id': user[0],
-            'email': email,
-            'username': user[1],
-            'full_name': user[3],
-            'company': user[4],
-            'role': user[5],
-            'is_premium': bool(user[6])
-        }
-    
-    conn.close()
-    return None
-
-def validate_email(email):
-    """Validate email format"""
-    pattern = r'^[\w\.-]+@[\w\.-]+\.\w+$'
-    return re.match(pattern, email) is not None
-
-def validate_password(password):
-    """Check password strength"""
-    if len(password) < 8:
-        return False, "Password must be at least 8 characters"
-    if not re.search(r'[A-Z]', password):
-        return False, "Password must contain uppercase letter"
-    if not re.search(r'[a-z]', password):
-        return False, "Password must contain lowercase letter"
-    if not re.search(r'\d', password):
-        return False, "Password must contain number"
-    return True, "Password is strong"
-
-
-def show_login_page():
-    """Display login and registration page"""
-    apply_futuristic_theme()
-    
-    st.markdown("""
-    <div style="text-align: center; padding: 30px; background: rgba(20, 25, 47, 0.9);
-                border-radius: 20px; border: 2px solid #00ffff; margin-bottom: 30px;">
-        <h1 style="margin: 0;">🛡️ THREAT INTELLIGENCE PLATFORM</h1>
-        <p style="color: #b8bcc8;">Secure Access Portal</p>
-    </div>
-    """, unsafe_allow_html=True)
-    
-    tab1, tab2 = st.tabs(["🔐 Login", "📝 Register"])
-    
-    with tab1:
-        st.markdown("### Welcome Back")
-        
-        with st.form("login_form"):
-            email = st.text_input("Email", placeholder="your@email.com")
-            password = st.text_input("Password", type="password")
-            
-            submit = st.form_submit_button("LOGIN", type="primary")
-            
-            if submit:
-                if email and password:
-                    user = verify_user(email, password)
-                    if user:
-                        st.session_state.authenticated = True
-                        st.session_state.user = user
-                        st.success(f"Welcome, {user['username']}!")
-                        time.sleep(1)
-                        st.rerun()
-                    else:
-                        st.error("Invalid credentials")
-                else:
-                    st.error("Enter email and password")
-    
-    with tab2:
-        st.markdown("### Create Account")
-        
-        with st.form("register_form"):
-            col1, col2 = st.columns(2)
-            
-            with col1:
-                reg_name = st.text_input("Full Name")
-                reg_email = st.text_input("Email")
-                reg_username = st.text_input("Username")
-            
-            with col2:
-                reg_company = st.text_input("Company (Optional)")
-                reg_password = st.text_input("Password", type="password")
-                reg_password2 = st.text_input("Confirm Password", type="password")
-            
-            terms = st.checkbox("I agree to Terms of Service")
-            
-            register = st.form_submit_button("REGISTER", type="primary")
-            
-            if register:
-                if not all([reg_name, reg_email, reg_username, reg_password]):
-                    st.error("Fill all required fields")
-                elif not validate_email(reg_email):
-                    st.error("Invalid email")
-                elif reg_password != reg_password2:
-                    st.error("Passwords don't match")
-                else:
-                    is_valid, msg = validate_password(reg_password)
-                    if not is_valid:
-                        st.error(msg)
-                    elif not terms:
-                        st.error("Accept Terms of Service")
-                    else:
-                        success, message = create_user(
-                            reg_email, reg_username, reg_password, 
-                            reg_name, reg_company
-                        )
-                        if success:
-                            st.success(message)
-                        else:
-                            st.error(message)
-
 
 # ============================================================================
 # FUTURISTIC THEME STYLING
@@ -1164,51 +977,6 @@ def show_threat_details_popup(threats_df, filter_type='all'):
 # ============================================================================
 
 def main():
-
-    
-    # Initialize database
-    init_database()
-    
-    # Initialize session state
-    if 'authenticated' not in st.session_state:
-        st.session_state.authenticated = False
-    if 'user' not in st.session_state:
-        st.session_state.user = None
-    
-    # Check authentication
-    if not st.session_state.authenticated:
-        show_login_page()
-        return
-    
-    # If authenticated, show the dashboard
-    apply_futuristic_theme()
-    initialize_auto_update()
-    
-    # Add user info and logout button in header
-    user = st.session_state.user
-    is_premium = user.get('is_premium', False)
-    
-    # Your existing dashboard code continues here...
-    # But first, add this user header:
-    
-    col1, col2, col3 = st.columns([8, 2, 1])
-    with col2:
-        st.markdown(f"""
-        <div style="padding: 10px; background: rgba(20, 25, 47, 0.8); 
-                    border-radius: 10px; border: 1px solid #00ffff;">
-            <p style="margin: 0; color: #00ffff;">👤 {user['username']}</p>
-            <p style="margin: 0; color: {'gold' if is_premium else '#b8bcc8'}; font-size: 0.9em;">
-                {'⭐ PREMIUM' if is_premium else '🆓 FREE'}
-            </p>
-        </div>
-        """, unsafe_allow_html=True)
-    
-    with col3:
-        if st.button("🚪 Logout"):
-            st.session_state.authenticated = False
-            st.session_state.user = None
-            st.rerun()
-
     apply_futuristic_theme()
     initialize_auto_update()
     
@@ -1679,19 +1447,9 @@ def main():
 
     # Tab 3: Intelligence Analysis
     with main_tabs[3]:
-        if not is_premium:
-            st.markdown("""
-            <div style="padding: 40px; background: rgba(20, 25, 47, 0.95);
-                    border: 2px solid gold; border-radius: 20px; text-align: center;">
-                <h2>🔒 Premium Feature</h2>
-                <p>This feature requires a Premium subscription</p>
-                <p>Contact admin to upgrade your account</p>
-            </div>
-            """, unsafe_allow_html=True)
-        else:
-    
+        st.markdown("### 🔬 THREAT INTELLIGENCE ANALYSIS")
         
-         if not threat_df.empty:
+        if not threat_df.empty:
             anal_col1, anal_col2 = st.columns(2)
             
             with anal_col1:
@@ -1756,7 +1514,7 @@ def main():
                             st.markdown("**Target Sectors:**")
                             for sector, count in target_sectors.items():
                                 st.markdown(f"• {sector}: {count}")
-         else:
+        else:
             st.info("No threat data available with current filters")
 
     # Tab 3: Human-Targeted Attacks
