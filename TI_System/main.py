@@ -1326,22 +1326,22 @@ def main():
     # Header with user info and logout
     col1, col2, col3 = st.columns([6, 2, 1])
     
-    with col1:
-        st.markdown(f"""
-        <div style="text-align: center; padding: 30px; background: rgba(20, 25, 47, 0.7); 
-                    backdrop-filter: blur(20px); border-radius: 20px; 
-                    border: 2px solid rgba(0, 255, 255, 0.3); margin-bottom: 30px;
-                    box-shadow: 0 0 40px rgba(0, 255, 255, 0.2);">
-            <h1 style="margin: 0;">THREAT INTELLIGENCE PLATFORM</h1>
-            <p style="color: #b8bcc8; font-size: 1.1em; margin-top: 10px; letter-spacing: 2px;">
-                REAL-TIME THREAT DETECTION • AUTO-UPDATING FEEDS • PREDICTIVE ANALYTICS
-            </p>
-            <p style="color: #00ff00; font-size: 0.9em; margin-top: 5px;">
-                🟢 FEEDS AUTO-UPDATE EVERY 5 MINUTES | Last Update: {st.session_state.last_update.strftime('%H:%M:%S')} | 
-                Next Update in: {minutes_until_next}m {seconds_remainder}s
-            </p>
-        </div>
-        """, unsafe_allow_html=True)
+  #  with col1:
+   #     st.markdown(f"""
+    #    <div style="text-align: center; padding: 30px; background: rgba(20, 25, 47, 0.7); 
+     #               backdrop-filter: blur(20px); border-radius: 20px; 
+      #              border: 2px solid rgba(0, 255, 255, 0.3); margin-bottom: 30px;
+       #             box-shadow: 0 0 40px rgba(0, 255, 255, 0.2);">
+        #    <h1 style="margin: 0;">THREAT INTELLIGENCE PLATFORM</h1>
+         #   <p style="color: #b8bcc8; font-size: 1.1em; margin-top: 10px; letter-spacing: 2px;">
+          #      REAL-TIME THREAT DETECTION • AUTO-UPDATING FEEDS • PREDICTIVE ANALYTICS
+           # </p>
+            #<p style="color: #00ff00; font-size: 0.9em; margin-top: 5px;">
+             #   🟢 FEEDS AUTO-UPDATE EVERY 5 MINUTES | Last Update: {st.session_state.last_update.strftime('%H:%M:%S')} | 
+              #  Next Update in: {minutes_until_next}m {seconds_remainder}s
+            #</p>
+        #</div>
+        #""", unsafe_allow_html=True)
     
     with col2:
         st.markdown(f"""
