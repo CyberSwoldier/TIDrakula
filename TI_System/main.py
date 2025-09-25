@@ -26,6 +26,7 @@ from supabase import create_client, Client
 import streamlit as st
 import re
 import time
+from postgrest.exceptions import APIError
 
 # ============================================================================
 # SUPABASE AUTHENTICATION SYSTEM
@@ -44,11 +45,24 @@ supabase = get_supabase_client()
 # User Management
 # ----------------------
 
+
+
 def create_user(email, password, username, full_name="", company=""):
-    """Create a new user with Supabase Auth"""
+    """
+    Create a new user with Supabase Auth.
+    This includes better error handling for a professional project.
+    """
     try:
+        # Step 1: Sign up the user with Supabase Auth.
+        # This handles the auth.users table.
         auth_response = supabase.auth.sign_up({"email": email, "password": password})
-        if auth_response.user:
+
+        if not auth_response.user:
+            return False, "Failed to create account. Auth response was empty."
+
+        # Step 2: Insert the user profile into the 'user_profiles' table.
+        # This action requires the correct RLS policy.
+        try:
             supabase.table('user_profiles').insert({
                 'id': auth_response.user.id,
                 'username': username,
@@ -57,13 +71,24 @@ def create_user(email, password, username, full_name="", company=""):
                 'role': 'free',
                 'is_premium': False
             }).execute()
-            return True, "Account created! Check your email to verify."
-        else:
-            return False, "Failed to create account"
+            return True, "Account created successfully! Please check your email to verify."
+        except APIError as api_e:
+            # If the profile insertion fails, delete the user from auth.users
+            # to prevent a orphaned account.
+            supabase.auth.admin.delete_user(auth_response.user.id)
+            print(f"Failed to create profile: {api_e}")
+            return False, "Account creation failed. Please try again or contact support."
+        
     except Exception as e:
-        if "already registered" in str(e).lower():
-            return False, "Email already registered"
-        return False, f"Registration failed: {str(e)}"
+        error_message = str(e).lower()
+        if "already registered" in error_message:
+            return False, "Email already registered."
+        
+        # Capture specific API errors from Supabase
+        if 'email not confirmed' in error_message or 'invalid login credentials' in error_message:
+            return False, "Login failed. Please confirm your email or check your credentials."
+            
+        return False, f"Registration failed due to an unexpected error: {e}"
 
 def verify_user(email, password):
     """Sign in user with Supabase Auth"""
