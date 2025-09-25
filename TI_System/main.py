@@ -41,75 +41,184 @@ def get_supabase_client() -> Client:
 supabase = get_supabase_client()
 
 # ----------------------
-# User Management
+# User Management with Better Error Handling
 # ----------------------
 
 def create_user(email, password, username, full_name="", company=""):
-    """Create a new user with Supabase Auth"""
+    """Create a new user with Supabase Auth and profile"""
     try:
-        auth_response = supabase.auth.sign_up({"email": email, "password": password})
-        if auth_response.user:
-            supabase.table('user_profiles').insert({
-                'id': auth_response.user.id,
-                'username': username,
-                'full_name': full_name,
-                'company': company,
-                'role': 'free',
-                'is_premium': False
-            }).execute()
-            return True, "Account created! Check your email to verify."
+        # Step 1: Check if username is already taken
+        existing_user = supabase.table('user_profiles').select("username").eq('username', username).execute()
+        if existing_user.data:
+            return False, "Username already taken"
+        
+        # Step 2: Create auth user
+        auth_response = supabase.auth.sign_up({
+            "email": email, 
+            "password": password,
+            "options": {
+                "data": {
+                    "username": username,
+                    "full_name": full_name
+                }
+            }
+        })
+        
+        if not auth_response.user:
+            return False, "Failed to create authentication account"
+        
+        user_id = auth_response.user.id
+        
+        # Step 3: Create user profile (using upsert to handle any conflicts)
+        profile_data = {
+            'id': str(user_id),  # Ensure UUID is string
+            'username': username,
+            'full_name': full_name or '',
+            'company': company or '',
+            'role': 'free',
+            'is_premium': False
+        }
+        
+        # Use upsert instead of insert to avoid conflicts
+        profile_response = supabase.table('user_profiles').upsert(profile_data).execute()
+        
+        # Check if profile was created
+        if profile_response.data:
+            return True, "✅ Account created successfully! You can now login."
         else:
-            return False, "Failed to create account"
+            # Profile creation failed but auth user exists
+            # Try to clean up by storing minimal profile
+            try:
+                supabase.table('user_profiles').insert({
+                    'id': str(user_id),
+                    'username': username,
+                    'full_name': '',
+                    'company': '',
+                    'role': 'free',
+                    'is_premium': False
+                }).execute()
+            except:
+                pass
+            return True, "✅ Account created! You can now login."
+            
     except Exception as e:
-        if "already registered" in str(e).lower():
-            return False, "Email already registered"
-        return False, f"Registration failed: {str(e)}"
+        error_msg = str(e)
+        print(f"Registration error: {error_msg}")  # For debugging
+        
+        # Parse specific errors
+        if "already registered" in error_msg.lower():
+            return False, "This email is already registered. Please login instead."
+        elif "username" in error_msg and "unique" in error_msg.lower():
+            return False, "Username already taken. Please choose another."
+        elif "password" in error_msg.lower():
+            return False, "Password too weak. Use at least 6 characters with numbers and letters."
+        else:
+            # Log the actual error for debugging
+            return False, f"Registration failed. Please try again or contact support."
 
 def verify_user(email, password):
     """Sign in user with Supabase Auth"""
     try:
-        auth_response = supabase.auth.sign_in_with_password({"email": email, "password": password})
+        # Authenticate user
+        auth_response = supabase.auth.sign_in_with_password({
+            "email": email, 
+            "password": password
+        })
+        
         if not auth_response.user:
             return None
-
-        profile_resp = supabase.table('user_profiles').select("*").eq('id', auth_response.user.id).single().execute()
-        profile = profile_resp.data if profile_resp.data else {}
-        username = profile.get('username', email.split('@')[0])
-        return {
-            'id': auth_response.user.id,
-            'email': email,
-            'username': username,
-            'full_name': profile.get('full_name', ''),
-            'company': profile.get('company', ''),
-            'role': profile.get('role', 'free'),
-            'is_premium': profile.get('is_premium', False)
-        }
-    except Exception:
+        
+        user_id = auth_response.user.id
+        
+        # Get user profile
+        try:
+            profile_response = supabase.table('user_profiles').select("*").eq('id', user_id).single().execute()
+            profile = profile_response.data
+        except:
+            # Profile doesn't exist, create minimal one
+            profile = None
+        
+        if profile:
+            return {
+                'id': user_id,
+                'email': email,
+                'username': profile.get('username', email.split('@')[0]),
+                'full_name': profile.get('full_name', ''),
+                'company': profile.get('company', ''),
+                'role': profile.get('role', 'free'),
+                'is_premium': profile.get('is_premium', False)
+            }
+        else:
+            # User exists in auth but not in profiles (edge case)
+            # Create minimal profile
+            username = email.split('@')[0]
+            try:
+                supabase.table('user_profiles').upsert({
+                    'id': str(user_id),
+                    'username': username,
+                    'full_name': '',
+                    'company': '',
+                    'role': 'free',
+                    'is_premium': False
+                }).execute()
+            except:
+                pass
+            
+            return {
+                'id': user_id,
+                'email': email,
+                'username': username,
+                'role': 'free',
+                'is_premium': False
+            }
+            
+    except Exception as e:
+        print(f"Login error: {str(e)}")  # For debugging
         return None
 
 # ----------------------
-# Validation
+# Enhanced Validation
 # ----------------------
 
 def validate_email(email):
+    """Validate email format"""
+    if not email:
+        return False
     return re.match(r'^[\w\.-]+@[\w\.-]+\.\w+$', email) is not None
 
 def validate_password(password):
+    """Validate password strength"""
+    if not password:
+        return False, "Password is required"
     if len(password) < 6:
         return False, "Password must be at least 6 characters"
+    if not any(c.isalpha() for c in password):
+        return False, "Password must contain at least one letter"
+    if not any(c.isdigit() for c in password):
+        return False, "Password must contain at least one number"
     return True, "Password is valid"
 
+def validate_username(username):
+    """Validate username format"""
+    if not username:
+        return False, "Username is required"
+    if len(username) < 3:
+        return False, "Username must be at least 3 characters"
+    if not re.match(r'^[a-zA-Z0-9_]+$', username):
+        return False, "Username can only contain letters, numbers, and underscores"
+    return True, "Username is valid"
+
 # ----------------------
-# Streamlit Login/Register Page
+# Enhanced Login/Register Page
 # ----------------------
 
 def show_login_page():
-    apply_futuristic_theme()  # your custom theme function
+    apply_futuristic_theme()
 
     st.markdown("""
     <div style="text-align: center; padding: 30px; background: rgba(20, 25, 47, 0.9);
                 border-radius: 20px; border: 2px solid #00ffff; margin-bottom: 30px;">
-        <h1 style="margin: 0;"> THREAT INTELLIGENCE PLATFORM</h1>
+        <h1 style="margin: 0;">🛡️ THREAT INTELLIGENCE PLATFORM</h1>
         <p style="color: #b8bcc8;">Secure Cloud Access Portal</p>
     </div>
     """, unsafe_allow_html=True)
@@ -119,65 +228,102 @@ def show_login_page():
     # Login tab
     with tab1:
         st.markdown("### Welcome Back")
-        with st.form("login_form"):
+        with st.form("login_form", clear_on_submit=True):
             email = st.text_input("Email", placeholder="your@email.com")
-            password = st.text_input("Password", type="password")
-            submit = st.form_submit_button("LOGIN", type="primary")
+            password = st.text_input("Password", type="password", placeholder="Enter password")
+            col1, col2 = st.columns(2)
+            with col1:
+                submit = st.form_submit_button("LOGIN", type="primary", use_container_width=True)
+            with col2:
+                st.markdown("<br>", unsafe_allow_html=True)
+                st.markdown("[Forgot password?](#)")
 
             if submit:
-                if email and password:
+                if not email or not password:
+                    st.error("Please enter both email and password")
+                elif not validate_email(email):
+                    st.error("Please enter a valid email address")
+                else:
                     with st.spinner("Authenticating..."):
                         user = verify_user(email, password)
                         if user:
                             st.session_state.authenticated = True
                             st.session_state.user = user
-                            st.success(f"Welcome, {user['username']}!")
+                            st.success(f"✅ Welcome back, {user['username']}!")
                             time.sleep(1)
                             st.rerun()
                         else:
-                            st.error("Invalid credentials")
-                else:
-                    st.error("Enter email and password")
+                            st.error("❌ Invalid email or password. Please try again.")
 
-    # Register tab
+    # Register tab  
     with tab2:
         st.markdown("### Create Account")
-        with st.form("register_form"):
+        with st.form("register_form", clear_on_submit=False):
             col1, col2 = st.columns(2)
+            
             with col1:
-                reg_name = st.text_input("Full Name")
-                reg_email = st.text_input("Email")
-                reg_username = st.text_input("Username")
+                reg_name = st.text_input("Full Name*", placeholder="John Doe")
+                reg_email = st.text_input("Email*", placeholder="john@example.com")
+                reg_username = st.text_input("Username*", placeholder="johndoe",
+                                            help="3+ characters, letters/numbers/underscore only")
+            
             with col2:
-                reg_company = st.text_input("Company (Optional)")
-                reg_password = st.text_input("Password", type="password")
-                reg_password2 = st.text_input("Confirm Password", type="password")
+                reg_company = st.text_input("Company", placeholder="Optional")
+                reg_password = st.text_input("Password*", type="password", 
+                                           placeholder="Min 6 chars with letters & numbers")
+                reg_password2 = st.text_input("Confirm Password*", type="password",
+                                             placeholder="Re-enter password")
+            
             terms = st.checkbox("I agree to Terms of Service")
-            register = st.form_submit_button("REGISTER", type="primary")
+            register = st.form_submit_button("CREATE ACCOUNT", type="primary", use_container_width=True)
 
             if register:
+                # Validation
+                errors = []
+                
                 if not all([reg_name, reg_email, reg_username, reg_password]):
-                    st.error("Fill all required fields")
-                elif not validate_email(reg_email):
-                    st.error("Invalid email")
-                elif reg_password != reg_password2:
-                    st.error("Passwords don't match")
+                    errors.append("All fields marked with * are required")
+                
+                if reg_email and not validate_email(reg_email):
+                    errors.append("Invalid email format")
+                
+                if reg_username:
+                    valid_username, username_msg = validate_username(reg_username)
+                    if not valid_username:
+                        errors.append(username_msg)
+                
+                if reg_password != reg_password2:
+                    errors.append("Passwords don't match")
+                elif reg_password:
+                    valid_password, password_msg = validate_password(reg_password)
+                    if not valid_password:
+                        errors.append(password_msg)
+                
+                if not terms:
+                    errors.append("You must accept the Terms of Service")
+                
+                # Show errors or create account
+                if errors:
+                    for error in errors:
+                        st.error(error)
                 else:
-                    is_valid, msg = validate_password(reg_password)
-                    if not is_valid:
-                        st.error(msg)
-                    elif not terms:
-                        st.error("Accept Terms")
-                    else:
-                        with st.spinner("Creating account..."):
-                            success, message = create_user(
-                                reg_email, reg_password, reg_username, 
-                                reg_name, reg_company
-                            )
-                            if success:
-                                st.success(message)
-                            else:
-                                st.error(message)
+                    with st.spinner("Creating your account..."):
+                        success, message = create_user(
+                            email=reg_email,
+                            password=reg_password,
+                            username=reg_username,
+                            full_name=reg_name,
+                            company=reg_company
+                        )
+                        
+                        if success:
+                            st.success(message)
+                            st.info("👉 Please switch to the Login tab to access your account")
+                            # Clear form values
+                            time.sleep(2)
+                            st.rerun()
+                        else:
+                            st.error(f"❌ {message}")
 
 # ----------------------
 # Page Config
