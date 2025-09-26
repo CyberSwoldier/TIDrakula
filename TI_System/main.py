@@ -2082,7 +2082,7 @@ def main():
 
     # Tab 4: Security Recommendations
     with main_tabs[4]:
-            with main_tabs[3]:
+            
         if not is_premium:
             st.markdown("""
             <div style="padding: 40px; background: rgba(20, 25, 47, 0.95);
