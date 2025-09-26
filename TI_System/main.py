@@ -2281,8 +2281,8 @@ if __name__ == "__main__":
 st.markdown("""
 <div class="footer" style="margin-top: 50px;">
     <p style="margin: 0;">
-        Developed by <a href="https://www.linkedin.com/in/ricardopinto110993/" target="_blank" style="color: #000000; font-weight: bold;">Ricardo Mendes Pinto</a> | 
-        Powered by MITRE ATT&CK Framework
+        Developed by <a href="https://www.linkedin.com/in/ricardopinto110993/" target="_blank" style="color: #ffffff; font-weight: bold;">Ricardo Mendes Pinto</a> | 
+        Powered by MITRE ATT&CK and AlienVault OTX API
     </p>
 </div>
 """, unsafe_allow_html=True)  
