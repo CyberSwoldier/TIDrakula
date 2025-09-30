@@ -21,7 +21,7 @@ all_articles.append({
                     'ioc_domain': source,
                     'mitigation': 'Information only'
                 })
-        except:
+    except:
             continue
             
     return pd.DataFrame(all_articles)
