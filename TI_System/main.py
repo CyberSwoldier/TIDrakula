@@ -44,13 +44,18 @@ class APIConfig:
     """Secure API configuration management"""
     
     @staticmethod
-    def get_api_keys():
-        """Retrieve API keys from session state or prompt user"""
+    def initialize_session_state():
+        """Initialize API-related session state variables"""
         if 'api_keys_configured' not in st.session_state:
             st.session_state.api_keys_configured = False
+        if 'otx_api_key' not in st.session_state:
             st.session_state.otx_api_key = ""
+        if 'shodan_api_key' not in st.session_state:
             st.session_state.shodan_api_key = ""
-        
+    
+    @staticmethod
+    def get_api_keys():
+        """Retrieve API keys from session state"""
         return {
             'otx': st.session_state.get('otx_api_key', ''),
             'shodan': st.session_state.get('shodan_api_key', '')
@@ -59,6 +64,8 @@ class APIConfig:
     @staticmethod
     def configure_apis():
         """API configuration interface"""
+        APIConfig.initialize_session_state()
+        
         with st.sidebar.expander("⚙️ API CONFIGURATION", expanded=not st.session_state.api_keys_configured):
             st.markdown("### 🔑 API Keys Setup")
             
@@ -904,7 +911,9 @@ def create_top_threats_table(df, n=10):
 def main():
     apply_futuristic_theme()
     
-    # Initialize session state
+    # Initialize all session state variables
+    APIConfig.initialize_session_state()
+    
     if 'ml_models' not in st.session_state:
         st.session_state.ml_models = ThreatMLModels()
     if 'last_refresh' not in st.session_state:
