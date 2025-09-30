@@ -1,7 +1,5 @@
 # File: requirements.txt
 # ===========================
-# Requirements file for Threat Intelligence System
-
 # Core dependencies
 streamlit==1.49.1
 pandas==2.3.2
@@ -15,6 +13,9 @@ bcrypt
 plotly==6.3.0
 matplotlib==3.10.6
 
+# Machine Learning (NEW - Required for ML features)
+scikit-learn==1.5.2
+
 # Data processing
 openpyxl==3.1.5
 xlsxwriter==3.2.9
@@ -25,8 +26,8 @@ pycountry==24.6.1
 tldextract==5.3.0
 geoip2==5.1.0
 
-# NLP (optional)
-spacy==3.8.7
+# NLP (optional - not used in current code)
+# spacy==3.8.7
 
 # OTX Integration
 OTXv2==1.5.12
@@ -37,6 +38,9 @@ python-dotenv==1.0.1
 schedule==1.2.2
 unicodedata2==15.1.0
 
+# Supabase (if using database features)
+supabase>=2.0.0
+
 # Testing (optional)
 pytest==7.4.4
 pytest-cov==4.1.0
@@ -44,5 +48,3 @@ pytest-cov==4.1.0
 # Development (optional)
 black==24.4.2
 flake8==7.1.1
-supabase>=2.0.0
-python-dotenv>=1.0.0
