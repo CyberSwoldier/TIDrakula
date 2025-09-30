@@ -20,7 +20,7 @@ from typing import Dict, List, Tuple
 # Page configuration
 st.set_page_config(
     page_title="Threat Intelligence Platform - TIP",
-    page_icon="ðŸ›¡ï¸",
+    page_icon="🧛",
     layout="wide",
     initial_sidebar_state="expanded"
 )
@@ -297,7 +297,7 @@ class ThreatIntelligence:
             ]
         },
         'related_techniques': ['T1078', 'T1193', 'T1204'],
-        'notes': 'Phishing is a common initial vector â€” defenses should combine prevention, detection, and rapid response (credential resets, log analysis).'
+        'notes': 'Phishing is a common initial vector — defenses should combine prevention, detection, and rapid response (credential resets, log analysis).'
     },
 
     'T1486': {
@@ -336,7 +336,7 @@ class ThreatIntelligence:
         'severity': 'High',
         'description': 'Adversaries perform DoS/DDoS attacks to degrade or block availability of targeted resources.',
         'platforms': ['Network infrastructure', 'Cloud services', 'Web applications'],
-        'permissions_required': 'None â€” external network access sufficient',
+        'permissions_required': 'None — external network access sufficient',
         'example_behaviors': [
             'Volumetric traffic floods to saturate bandwidth',
             'Application-layer request floods (HTTP GET/POST floods)',
@@ -357,7 +357,7 @@ class ThreatIntelligence:
             ]
         },
         'related_techniques': ['T1499', 'T1531'],
-        'notes': 'Preparation (contracts with providers, runbooks) is key â€” operational playbooks reduce downtime during an attack.'
+        'notes': 'Preparation (contracts with providers, runbooks) is key — operational playbooks reduce downtime during an attack.'
     },
 
     'T1190': {
@@ -416,7 +416,7 @@ class ThreatIntelligence:
             ]
         },
         'related_techniques': ['T1204', 'T1218'],
-        'notes': 'Scripting is commonly used for both benign admin tasks and malicious activity â€” robust logging + allowlisting reduce risk.'
+        'notes': 'Scripting is commonly used for both benign admin tasks and malicious activity — robust logging + allowlisting reduce risk.'
     },
 
     'T1055': {
@@ -445,7 +445,7 @@ class ThreatIntelligence:
             ]
         },
         'related_techniques': ['T1218', 'T1574'],
-        'notes': 'Memory-only techniques are harder to detect via file-based controls â€” focus on behavioral/telemetry-based detection.'
+        'notes': 'Memory-only techniques are harder to detect via file-based controls — focus on behavioral/telemetry-based detection.'
     },
 
     'T1003': {
@@ -708,11 +708,11 @@ def get_security_recommendations(threat_data):
         'title': 'Information Security Management System (ISMS) Review',
         'threat': f'Multiple threat vectors detected across {len(threat_data["technique_name"].unique())} attack types',
         'controls': [
-            'ðŸ”¸ A.12.1.1 - Documented operating procedures',
-            'ðŸ”¸ A.12.6.1 - Management of technical vulnerabilities',
-            'ðŸ”¸ A.13.1.1 - Network controls and segmentation',
-            'ðŸ”¸ A.14.2.9 - System acceptance testing',
-            'ðŸ”¸ A.16.1.1 - Incident response procedures'
+            '🔸 A.12.1.1 - Documented operating procedures',
+            '🔸 A.12.6.1 - Management of technical vulnerabilities',
+            '🔸 A.13.1.1 - Network controls and segmentation',
+            '🔸 A.14.2.9 - System acceptance testing',
+            '🔸 A.16.1.1 - Incident response procedures'
         ]
     })
     
@@ -723,11 +723,11 @@ def get_security_recommendations(threat_data):
         'title': 'NIST Framework Core Functions Activation',
         'threat': f'Critical threats detected: {len(threat_data[threat_data["severity"] == "Critical"])} instances',
         'controls': [
-            'ðŸ”¸ IDENTIFY (ID.RA): Conduct immediate risk assessment',
-            'ðŸ”¸ PROTECT (PR.AC): Strengthen access control measures',
-            'ðŸ”¸ DETECT (DE.CM): Enhance continuous monitoring',
-            'ðŸ”¸ RESPOND (RS.AN): Activate incident analysis procedures',
-            'ðŸ”¸ RECOVER (RC.RP): Update recovery planning'
+            '🔸 IDENTIFY (ID.RA): Conduct immediate risk assessment',
+            '🔸 PROTECT (PR.AC): Strengthen access control measures',
+            '🔸 DETECT (DE.CM): Enhance continuous monitoring',
+            '🔸 RESPOND (RS.AN): Activate incident analysis procedures',
+            '🔸 RECOVER (RC.RP): Update recovery planning'
         ]
     })
     
@@ -740,11 +740,11 @@ def get_security_recommendations(threat_data):
                 'title': 'Email Security Enhancement',
                 'threat': f'Phishing attacks: {count} instances detected',
                 'controls': [
-                    'ðŸ”¸ Implement DMARC policy with p=reject',
-                    'ðŸ”¸ Deploy DKIM signing for all domains',
-                    'ðŸ”¸ Configure SPF records with -all',
-                    'ðŸ”¸ Enable ATP/Safe Links protection',
-                    'ðŸ”¸ Conduct phishing simulation training (NIST SP 800-50)'
+                    '🔸 Implement DMARC policy with p=reject',
+                    '🔸 Deploy DKIM signing for all domains',
+                    '🔸 Configure SPF records with -all',
+                    '🔸 Enable ATP/Safe Links protection',
+                    '🔸 Conduct phishing simulation training (NIST SP 800-50)'
                 ]
             })
     
@@ -946,7 +946,7 @@ def create_trend_analysis_charts(threat_df, attack_type=None, country=None, sect
 def show_threat_details_popup(threats_df, filter_type='all'):
     """Display threat details in a popup-style expander"""
     
-    with st.expander(f"ðŸ“‹ Threat Details - {filter_type}", expanded=True):
+    with st.expander(f"📋 Threat Details - {filter_type}", expanded=True):
         if filter_type == 'critical':
             display_df = threats_df[threats_df['severity'] == 'Critical']
         elif filter_type == 'active':
@@ -1005,10 +1005,10 @@ def main():
                 box-shadow: 0 0 40px rgba(0, 255, 255, 0.2);">
         <h1 style="margin: 0;">THREAT INTELLIGENCE PLATFORM</h1>
         <p style="color: #b8bcc8; font-size: 1.1em; margin-top: 10px; letter-spacing: 2px;">
-            REAL-TIME THREAT DETECTION â€¢ AUTO-UPDATING FEEDS â€¢ PREDICTIVE ANALYTICS
+            REAL-TIME THREAT DETECTION • AUTO-UPDATING FEEDS • PREDICTIVE ANALYTICS
         </p>
         <p style="color: #00ff00; font-size: 0.9em; margin-top: 5px;">
-            ðŸŸ¢ FEEDS AUTO-UPDATE EVERY 5 MINUTES | Last Update: {st.session_state.last_update.strftime('%H:%M:%S')} | 
+            🟢 FEEDS AUTO-UPDATE EVERY 5 MINUTES | Last Update: {st.session_state.last_update.strftime('%H:%M:%S')} | 
             Next Update in: {minutes_until_next}m {seconds_remainder}s
         </p>
     </div>
@@ -1024,7 +1024,7 @@ def main():
         """, unsafe_allow_html=True)
         
         # Time Range Selection with Date Picker
-        st.markdown("### â° TIME RANGE")
+        st.markdown("### ⏰ TIME RANGE")
         time_option = st.radio(
             "Select time range option",
             options=['Quick Select', 'Custom Range'],
@@ -1069,7 +1069,7 @@ def main():
         st.markdown("---")
         
         # Attack Type Filter - All selected by default
-        st.markdown("### ðŸŽ¯ ATTACK TYPE")
+        st.markdown("### 🎯 ATTACK TYPE")
         attack_types = list(ThreatIntelligence.ATTACK_TECHNIQUES.values())
         attack_type_names = [attack['name'] for attack in attack_types]
         
@@ -1094,7 +1094,7 @@ def main():
         st.session_state.selected_attacks = selected_attacks
         
         # Target Country Filter - All selected by default
-        st.markdown("### ðŸŒ TARGET COUNTRY")
+        st.markdown("### 🌍 TARGET COUNTRY")
         countries = list(ThreatIntelligence.COUNTRIES.keys())
         
         col1, col2 = st.columns(2)
@@ -1117,7 +1117,7 @@ def main():
         st.session_state.selected_countries = selected_countries
         
         # Sector Filter - All selected by default
-        st.markdown("### ðŸ¢ TARGET SECTOR")
+        st.markdown("### 🏢 TARGET SECTOR")
         sectors = ThreatIntelligence.SECTORS
         
         col1, col2 = st.columns(2)
@@ -1140,7 +1140,7 @@ def main():
         st.session_state.selected_sectors = selected_sectors
         
         # Severity Filter - All selected by default
-        st.markdown("### âš ï¸ SEVERITY")
+        st.markdown("### ⚠️ SEVERITY")
         severity_options = ['Critical', 'High', 'Medium', 'Low']
         
         if 'selected_severity' not in st.session_state:
@@ -1155,7 +1155,7 @@ def main():
         st.session_state.selected_severity = severity_levels
         
         # Confidence threshold
-        st.markdown("### ðŸŽ¯ CONFIDENCE")
+        st.markdown("### 🎯 CONFIDENCE")
         confidence_threshold = st.slider(
             "Minimum Confidence (%)",
             min_value=0,
@@ -1166,7 +1166,7 @@ def main():
         
         st.markdown("---")
         
-        if st.button("ðŸ”„ APPLY FILTERS", use_container_width=True, type="primary"):
+        if st.button("🔄 APPLY FILTERS", use_container_width=True, type="primary"):
             st.rerun()
     
     # Apply filters to data
@@ -1181,19 +1181,19 @@ def main():
     
     # Main Dashboard Tabs
     main_tabs = st.tabs([
-        "ðŸŽ¯ Threat Overview",
-        "ðŸ‘¤ Human Targeted",
-        "ðŸŒ Global Threats",
-        "ðŸ“Š Intelligence Analysis",
-        "ðŸ’¡ Security Recommendations",
-        "ðŸ“ˆ Trend Analysis",
-        "ðŸ” IOC Scanner",
+        "🎯 Threat Overview",
+        "👤 Human Targeted",
+        "🌍 Global Threats",
+        "📊 Intelligence Analysis",
+        "💡 Security Recommendations",
+        "📈 Trend Analysis",
+        "🔍 IOC Scanner",
     ])
     
     # Tab 1: Threat Overview
     with main_tabs[0]:
         # Key Metrics
-        st.markdown("### ðŸ“Š KEY THREAT METRICS")
+        st.markdown("### 📊 KEY THREAT METRICS")
         
         metric_cols = st.columns(7)
         
@@ -1221,7 +1221,7 @@ def main():
             st.metric("Sectors", f"{affected_sectors}")
         
         # Live Threat Feed with proper styling
-        st.markdown("### ðŸ”´ LIVE THREAT FEED")
+        st.markdown("### 🔴 LIVE THREAT FEED")
         
         # Create a container for the scrollable feed
         feed_container = st.container()
@@ -1236,7 +1236,7 @@ def main():
                     'Low': '#00ff00'
                 }[threat['severity']]
                 
-                status = 'ðŸ›¡ï¸ BLOCKED' if threat['blocked'] else 'âš ï¸ ACTIVE'
+                status = '🛡️ BLOCKED' if threat['blocked'] else '⚠️ ACTIVE'
                 status_color = '#00ff00' if threat['blocked'] else '#ff0000'
                 
                 # Create properly styled threat cards
@@ -1282,7 +1282,7 @@ def main():
                     """, unsafe_allow_html=True)
         
         # Charts
-        st.markdown("### ðŸ“Š THREAT ANALYTICS")
+        st.markdown("### 📊 THREAT ANALYTICS")
         
         chart_col1, chart_col2 = st.columns(2)
         
@@ -1316,7 +1316,7 @@ def main():
     
     # Tab 2: Global Threats
     with main_tabs[2]:
-        st.markdown("### ðŸŒ GLOBAL THREAT LANDSCAPE")
+        st.markdown("### 🌍 GLOBAL THREAT LANDSCAPE")
         st.markdown("*Click and drag to rotate the globe. Click on a country to see detailed threat analysis.*")
         
         # 3D Interactive Globe
@@ -1326,7 +1326,7 @@ def main():
         globe_placeholder = st.plotly_chart(globe_fig, use_container_width=True, key="globe_chart")
         
         # Country selector for detailed view
-        st.markdown("### ðŸ“Š SELECT A COUNTRY FOR DETAILED ANALYSIS")
+        st.markdown("### 📊 SELECT A COUNTRY FOR DETAILED ANALYSIS")
         
         if not threat_df.empty:
             # Get list of countries with threats
@@ -1344,7 +1344,7 @@ def main():
                 country_threats = threat_df[threat_df['target_country'] == selected_country]
                 
                 if not country_threats.empty:
-                    st.markdown(f"### ðŸŽ¯ DETAILED THREAT ANALYSIS: {selected_country}")
+                    st.markdown(f"### 🎯 DETAILED THREAT ANALYSIS: {selected_country}")
                     
                     # Summary metrics
                     summary_cols = st.columns(6)
@@ -1370,14 +1370,14 @@ def main():
                         st.metric("Block Rate", f"{block_rate:.1f}%")
                     
                     # Detailed threat table with better styling
-                    st.markdown("#### ðŸ“‹ THREAT DETAILS")
+                    st.markdown("#### 📋 THREAT DETAILS")
                     
                     # Prepare display data
                     display_data = country_threats[['timestamp', 'technique_name', 'technique_description', 
                                                    'severity', 'threat_actor', 'target_sector', 
                                                    'blocked', 'active', 'confidence']].copy()
                     display_data['Status'] = display_data.apply(
-                        lambda x: 'ðŸ›¡ï¸ Blocked' if x['blocked'] else 'âš ï¸ Active', axis=1
+                        lambda x: '🛡️ Blocked' if x['blocked'] else '⚠️ Active', axis=1
                     )
                     display_data = display_data.drop(['blocked', 'active'], axis=1)
                     display_data.columns = ['Timestamp', 'Attack Type', 'Description', 'Severity', 
@@ -1447,13 +1447,13 @@ def main():
 
     # Tab 3: Intelligence Analysis
     with main_tabs[3]:
-        st.markdown("### ðŸ”¬ THREAT INTELLIGENCE ANALYSIS")
+        st.markdown("### 🔬 THREAT INTELLIGENCE ANALYSIS")
         
         if not threat_df.empty:
             anal_col1, anal_col2 = st.columns(2)
             
             with anal_col1:
-                st.markdown("#### ðŸŽ¯ ATTACK TECHNIQUES (Click for details)")
+                st.markdown("#### 🎯 ATTACK TECHNIQUES (Click for details)")
                 
                 technique_stats = threat_df.groupby(['technique_id', 'technique_name', 'technique_description']).size().reset_index(name='count')
                 technique_stats = technique_stats.nlargest(5, 'count')
@@ -1473,15 +1473,15 @@ def main():
                         with col_a:
                             st.markdown("**Top Affected Countries:**")
                             for country, count in affected_countries.items():
-                                st.markdown(f"â€¢ {country}: {count} attacks")
+                                st.markdown(f"• {country}: {count} attacks")
                         
                         with col_b:
                             st.markdown("**Top Affected Sectors:**")
                             for sector, count in affected_sectors.items():
-                                st.markdown(f"â€¢ {sector}: {count} attacks")
+                                st.markdown(f"• {sector}: {count} attacks")
             
             with anal_col2:
-                st.markdown("#### ðŸŽ­ THREAT ACTORS (Click for details)")
+                st.markdown("#### 🎭 THREAT ACTORS (Click for details)")
                 
                 actor_stats = threat_df['threat_actor'].value_counts().head(5)
                 
@@ -1502,30 +1502,30 @@ def main():
                         
                         st.markdown("**Primary Attack Types:**")
                         for attack, count in attack_types.items():
-                            st.markdown(f"â€¢ {attack}: {count} instances")
+                            st.markdown(f"• {attack}: {count} instances")
                         
                         col_a, col_b = st.columns(2)
                         with col_a:
                             st.markdown("**Target Countries:**")
                             for country, count in target_countries.items():
-                                st.markdown(f"â€¢ {country}: {count}")
+                                st.markdown(f"• {country}: {count}")
                         
                         with col_b:
                             st.markdown("**Target Sectors:**")
                             for sector, count in target_sectors.items():
-                                st.markdown(f"â€¢ {sector}: {count}")
+                                st.markdown(f"• {sector}: {count}")
         else:
             st.info("No threat data available with current filters")
 
     # Tab 3: Human-Targeted Attacks
     with main_tabs[1]:
-        st.markdown("### ðŸ‘¤ HUMAN-TARGETED ATTACK ANALYSIS")
+        st.markdown("### 👤 HUMAN-TARGETED ATTACK ANALYSIS")
         st.markdown("*Focus on attacks that exploit human psychology and behavior*")
         
         # Define human-targeted attack types
         human_attacks = {
             'Phishing': {
-                'icon': 'ðŸŽ£',
+                'icon': '🎣',
                 'description': 'Fraudulent emails mimicking legitimate organizations to steal credentials',
                 'risk': 'Critical',
                 'prevention': [
@@ -1536,7 +1536,7 @@ def main():
                 ]
             },
             'Vishing': {
-                'icon': 'ðŸ“ž',
+                'icon': '📞',
                 'description': 'Voice phishing attacks using phone calls to extract sensitive information',
                 'risk': 'High',
                 'prevention': [
@@ -1547,7 +1547,7 @@ def main():
                 ]
             },
             'Smishing': {
-                'icon': 'ðŸ“±',
+                'icon': '📱',
                 'description': 'SMS text message phishing to trick users into revealing information',
                 'risk': 'High',
                 'prevention': [
@@ -1558,7 +1558,7 @@ def main():
                 ]
             },
             'BEC (Business Email Compromise)': {
-                'icon': 'ðŸ’¼',
+                'icon': '💼',
                 'description': 'Sophisticated scams targeting businesses through impersonation of executives',
                 'risk': 'Critical',
                 'prevention': [
@@ -1569,7 +1569,7 @@ def main():
                 ]
             },
             'Whaling': {
-                'icon': 'ðŸ‹',
+                'icon': '🐋',
                 'description': 'Highly targeted phishing attacks aimed at senior executives',
                 'risk': 'Critical',
                 'prevention': [
@@ -1580,7 +1580,7 @@ def main():
                 ]
             },
             'Social Engineering': {
-                'icon': 'ðŸŽ­',
+                'icon': '🎭',
                 'description': 'Psychological manipulation to trick users into security mistakes',
                 'risk': 'High',
                 'prevention': [
@@ -1591,7 +1591,7 @@ def main():
                 ]
             },
             'Pretexting': {
-                'icon': 'ðŸŽ¯',
+                'icon': '🎯',
                 'description': 'Creating false scenarios to obtain information from targets',
                 'risk': 'Medium',
                 'prevention': [
@@ -1602,7 +1602,7 @@ def main():
                 ]
             },
             'Baiting': {
-                'icon': 'ðŸª¤',
+                'icon': '🪤',
                 'description': 'Using tempting items (USBs, downloads) to deliver malware',
                 'risk': 'High',
                 'prevention': [
@@ -1619,7 +1619,7 @@ def main():
         
         # Metrics for human-targeted attacks
         if not human_targeted_threats.empty:
-            st.markdown("#### ðŸ“Š HUMAN-TARGETED ATTACK METRICS")
+            st.markdown("#### 📊 HUMAN-TARGETED ATTACK METRICS")
             
             metric_cols = st.columns(5)
             with metric_cols[0]:
@@ -1646,12 +1646,12 @@ def main():
         
         # Recent Human-Targeted Attacks
         if not human_targeted_threats.empty:
-            st.markdown("#### ðŸ”´ RECENT HUMAN-TARGETED ATTACKS")
+            st.markdown("#### 🔴 RECENT HUMAN-TARGETED ATTACKS")
             
             recent_human = human_targeted_threats.nlargest(10, 'timestamp')
             for _, attack in recent_human.iterrows():
                 status_color = '#00ff00' if attack['blocked'] else '#ff0000'
-                status_text = 'ðŸ›¡ï¸ Blocked' if attack['blocked'] else 'âš ï¸ Active'
+                status_text = '🛡️ Blocked' if attack['blocked'] else '⚠️ Active'
                 
                 st.markdown(f"""
                 <div style="padding: 12px; margin: 8px 0;
@@ -1685,12 +1685,12 @@ def main():
 
     # Tab 4: Security Recommendations
     with main_tabs[4]:
-        st.markdown("### ðŸ’¡ SECURITY RECOMMENDATIONS (ISO 27001 & NIST)")
+        st.markdown("### 💡 SECURITY RECOMMENDATIONS (ISO 27001 & NIST)")
         
         recommendations = get_security_recommendations(threat_df)
         
         # Framework-based recommendations
-        st.markdown("#### ðŸ“‹ FRAMEWORK-BASED CONTROLS")
+        st.markdown("#### 📋 FRAMEWORK-BASED CONTROLS")
         for rec in recommendations:
             priority_color = {
                 'CRITICAL': '#ff0000',
@@ -1698,7 +1698,7 @@ def main():
                 'MEDIUM': '#ffff00'
             }.get(rec['priority'], '#00ff00')
             
-            with st.expander(f"âš ï¸ [{rec['framework']}] {rec['title']} - {rec['priority']} PRIORITY", expanded=False):
+            with st.expander(f"⚠️ [{rec['framework']}] {rec['title']} - {rec['priority']} PRIORITY", expanded=False):
                 st.markdown(f"""
                 <div style="padding: 15px; background: rgba(20, 25, 47, 0.7);
                             border: 2px solid {priority_color}; border-radius: 10px;">
@@ -1715,7 +1715,7 @@ def main():
                 """, unsafe_allow_html=True)
         
         # Security Best Practice Flashcards
-        st.markdown("#### ðŸ“š SECURITY BEST PRACTICES FLASHCARDS")
+        st.markdown("#### 📚 SECURITY BEST PRACTICES FLASHCARDS")
         
         # Define flashcards based on current threats
         top_threats = threat_df['technique_name'].value_counts().head(3) if not threat_df.empty else pd.Series()
@@ -1723,28 +1723,28 @@ def main():
         flashcards = [
             {
                 'title': 'Zero Trust Architecture',
-                'icon': 'ðŸ”',
+                'icon': '🔐',
                 'content': 'Implement "never trust, always verify" principle. Require continuous verification for all users and devices.',
                 'action': 'Deploy microsegmentation and identity-based access controls',
                 'priority': 'CRITICAL' if 'Phishing' in top_threats.index else 'HIGH'
             },
             {
                 'title': 'Threat Hunting Program',
-                'icon': 'ðŸŽ¯',
+                'icon': '🎯',
                 'content': 'Proactively search for cyber threats that evade existing security solutions.',
                 'action': 'Use threat intelligence feeds to hunt for IOCs in your environment',
                 'priority': 'HIGH'
             },
             {
                 'title': 'Incident Response Plan',
-                'icon': 'ðŸ“‹',
+                'icon': '📋',
                 'content': 'Maintain an updated IR plan with clear roles and recovery procedures.',
                 'action': 'Conduct tabletop exercises quarterly and update contact lists',
                 'priority': 'CRITICAL' if critical_threats > 10 else 'HIGH'
             },
             {
                 'title': 'Security Awareness Training',
-                'icon': 'ðŸŽ“',
+                'icon': '🎓',
                 'content': 'Regular training on latest threats, especially phishing and social engineering.',
                 'action': 'Implement monthly phishing simulations and track metrics',
                 'priority': 'CRITICAL' if 'Phishing' in top_threats.index else 'MEDIUM'
@@ -1796,7 +1796,7 @@ def main():
     
     # Tab 5: Trend Analysis
     with main_tabs[5]:
-        st.markdown("### ðŸ“ˆ CUSTOMIZABLE TREND ANALYSIS")
+        st.markdown("### 📈 CUSTOMIZABLE TREND ANALYSIS")
         
         if not threat_df.empty:
             trend_col1, trend_col2, trend_col3, trend_col4 = st.columns(4)
@@ -1845,14 +1845,14 @@ def main():
     
     # Tab 6: IOC Scanner
     with main_tabs[6]:
-        st.markdown("### ðŸ” IOC SCANNER & THREAT DETECTION")
+        st.markdown("### 🔍 IOC SCANNER & THREAT DETECTION")
         
         ioc_input = st.text_input(
             "Enter IOC (Hash, IP, Domain, or URL)",
             placeholder="e.g., 192.168.1.1, malicious.com, d41d8cd98f00b204e9800998ecf8427e"
         )
         
-        if st.button("ðŸ” SCAN IOC"):
+        if st.button("🔍 SCAN IOC"):
             if ioc_input:
                 with st.spinner("Scanning..."):
                     time.sleep(2)
