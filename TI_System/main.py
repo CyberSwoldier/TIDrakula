@@ -63,14 +63,14 @@ class APIConfig:
             st.markdown("### 🔑 API Keys Setup")
             
             otx_key = st.text_input(
-                "a64a6fc71743dd93f98f8b91b7a611e6bd219d32a9faa11d85256b7a81e8dd89",
+                "OTX API Key",
                 value=st.session_state.get('otx_api_key', ''),
                 type="password",
                 help="Get your free API key from: https://otx.alienvault.com"
             )
             
             shodan_key = st.text_input(
-                "u2dp7LUQXfqMjbazPVwhcfcQ6pqPWTnq",
+                "Shodan API Key",
                 value=st.session_state.get('shodan_api_key', ''),
                 type="password",
                 help="Get your API key from: https://account.shodan.io"
