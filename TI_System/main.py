@@ -448,7 +448,7 @@ def create_globe_map(threat_df):
     
     globe_data = []
     for _, row in country_threats.iterrows():
-        country = row['country']
+        country = row['target_country']  # Fixed: was row['country']
         if country in ThreatIntelligence.COUNTRIES:
             coords = ThreatIntelligence.COUNTRIES[country]
             globe_data.append({
