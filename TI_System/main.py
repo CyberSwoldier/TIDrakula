@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
-Advanced Threat Intelligence Platform with Enhanced Interactivity
-Auto-updating feeds every 5 minutes with comprehensive filtering and drill-down capabilities
+Advanced Threat Intelligence Platform with Machine Learning & Enhanced Interactivity
+Auto-updating feeds every 5 minutes with ML-powered analytics
 """
 
 import streamlit as st
@@ -17,10 +17,19 @@ import json
 import feedparser
 from typing import Dict, List, Tuple
 
+# Machine Learning imports
+from sklearn.ensemble import RandomForestClassifier, IsolationForest
+from sklearn.preprocessing import LabelEncoder
+from sklearn.model_selection import train_test_split
+from sklearn.metrics import accuracy_score
+from sklearn.cluster import KMeans
+import warnings
+warnings.filterwarnings('ignore')
+
 # Page configuration
 st.set_page_config(
     page_title="Threat Intelligence Platform - TIP",
-    page_icon="🧛",
+    page_icon="🛡️",
     layout="wide",
     initial_sidebar_state="expanded"
 )
@@ -153,10 +162,160 @@ def check_auto_update():
     return False
 
 # ============================================================================
+# MACHINE LEARNING MODELS
+# ============================================================================
+
+class ThreatMLModels:
+    """Machine Learning models for threat intelligence analysis"""
+    
+    @staticmethod
+    def prepare_features(threat_df):
+        """Prepare features for ML models"""
+        if threat_df.empty:
+            return None, None
+        
+        # Create a copy
+        df = threat_df.copy()
+        
+        # Encode categorical variables
+        le_technique = LabelEncoder()
+        le_actor = LabelEncoder()
+        le_sector = LabelEncoder()
+        le_country = LabelEncoder()
+        
+        df['technique_encoded'] = le_technique.fit_transform(df['technique_name'])
+        df['actor_encoded'] = le_actor.fit_transform(df['threat_actor'])
+        df['sector_encoded'] = le_sector.fit_transform(df['target_sector'])
+        df['country_encoded'] = le_country.fit_transform(df['target_country'])
+        
+        # Create severity numeric
+        severity_map = {'Low': 1, 'Medium': 2, 'High': 3, 'Critical': 4}
+        df['severity_numeric'] = df['severity'].map(severity_map)
+        
+        # Time-based features
+        df['hour'] = pd.to_datetime(df['timestamp']).dt.hour
+        df['day_of_week'] = pd.to_datetime(df['timestamp']).dt.dayofweek
+        
+        # Feature matrix
+        features = ['technique_encoded', 'actor_encoded', 'sector_encoded', 
+                   'country_encoded', 'confidence', 'hour', 'day_of_week']
+        
+        X = df[features]
+        y = df['severity_numeric']
+        
+        return X, y, df
+    
+    @staticmethod
+    def train_threat_predictor(threat_df):
+        """Train a model to predict threat severity"""
+        X, y, df = ThreatMLModels.prepare_features(threat_df)
+        
+        if X is None:
+            return None, None
+        
+        # Split data
+        X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
+        
+        # Train Random Forest
+        model = RandomForestClassifier(n_estimators=100, random_state=42)
+        model.fit(X_train, y_train)
+        
+        # Evaluate
+        y_pred = model.predict(X_test)
+        accuracy = accuracy_score(y_test, y_pred)
+        
+        # Feature importance
+        feature_importance = pd.DataFrame({
+            'feature': X.columns,
+            'importance': model.feature_importances_
+        }).sort_values('importance', ascending=False)
+        
+        return model, {'accuracy': accuracy, 'feature_importance': feature_importance}
+    
+    @staticmethod
+    def detect_anomalies(threat_df):
+        """Detect anomalous threats using Isolation Forest"""
+        X, _, df = ThreatMLModels.prepare_features(threat_df)
+        
+        if X is None:
+            return None
+        
+        # Train Isolation Forest
+        iso_forest = IsolationForest(contamination=0.1, random_state=42)
+        anomaly_labels = iso_forest.fit_predict(X)
+        
+        # Add anomaly flag to dataframe
+        df['is_anomaly'] = anomaly_labels == -1
+        
+        return df[df['is_anomaly']]
+    
+    @staticmethod
+    def cluster_threats(threat_df, n_clusters=5):
+        """Cluster similar threats together"""
+        X, _, df = ThreatMLModels.prepare_features(threat_df)
+        
+        if X is None:
+            return None
+        
+        # Perform K-means clustering
+        kmeans = KMeans(n_clusters=n_clusters, random_state=42)
+        df['cluster'] = kmeans.fit_predict(X)
+        
+        # Analyze clusters
+        cluster_analysis = []
+        for cluster_id in range(n_clusters):
+            cluster_data = df[df['cluster'] == cluster_id]
+            
+            analysis = {
+                'cluster_id': cluster_id,
+                'size': len(cluster_data),
+                'top_technique': cluster_data['technique_name'].mode()[0] if len(cluster_data) > 0 else 'Unknown',
+                'top_actor': cluster_data['threat_actor'].mode()[0] if len(cluster_data) > 0 else 'Unknown',
+                'top_sector': cluster_data['target_sector'].mode()[0] if len(cluster_data) > 0 else 'Unknown',
+                'avg_confidence': cluster_data['confidence'].mean(),
+                'critical_count': len(cluster_data[cluster_data['severity'] == 'Critical'])
+            }
+            cluster_analysis.append(analysis)
+        
+        return pd.DataFrame(cluster_analysis)
+    
+    @staticmethod
+    def forecast_threats(threat_df, days_ahead=7):
+        """Simple time series forecast for threat trends"""
+        if threat_df.empty:
+            return None
+        
+        # Aggregate by day
+        threat_df['date'] = pd.to_datetime(threat_df['timestamp']).dt.date
+        daily_counts = threat_df.groupby('date').size().reset_index(name='count')
+        daily_counts['date'] = pd.to_datetime(daily_counts['date'])
+        daily_counts = daily_counts.sort_values('date')
+        
+        # Simple moving average forecast
+        window = min(7, len(daily_counts))
+        if window > 0:
+            ma = daily_counts['count'].rolling(window=window).mean().iloc[-1]
+            
+            # Generate forecast dates
+            last_date = daily_counts['date'].max()
+            forecast_dates = pd.date_range(start=last_date + timedelta(days=1), periods=days_ahead, freq='D')
+            
+            # Simple forecast (using MA with some random variation)
+            forecast_values = [ma + random.randint(-10, 10) for _ in range(days_ahead)]
+            
+            forecast_df = pd.DataFrame({
+                'date': forecast_dates,
+                'forecast_count': forecast_values
+            })
+            
+            return forecast_df
+        
+        return None
+
+# ============================================================================
 # DATA GENERATION AND FEEDS INTEGRATION
 # ============================================================================
 
-# @st.cache_data(ttl=600)  # Cache the data for 10 minutes
 def generate_data():
     """
     Generates a mock dataframe for threat intelligence data.
@@ -234,7 +393,7 @@ def fetch_and_process_rss_feeds():
     feeds = {
         "BleepingComputer": "https://www.bleepingcomputer.com/feed/",
         "Hacker News": "https://hnrss.org/frontpage",
-        "Malwarebytes": "https://blog.malwarebytes.com/feed/" # Commercial feed
+        "Malwarebytes": "https://blog.malwarebytes.com/feed/"
     }
     
     all_articles = []
@@ -244,7 +403,6 @@ def fetch_and_process_rss_feeds():
             # Check for a valid publication date
             pub_date = entry.get('published_parsed')
             if pub_date:
-                # Use a specific time zone for consistency if needed, e.g., UTC
                 timestamp = datetime(*pub_date[:6])
             else:
                 timestamp = datetime.now()
@@ -256,7 +414,7 @@ def fetch_and_process_rss_feeds():
                 'threat_type': "News",
                 'severity': "Info",
                 'status': "Active",
-                'is_human_targeted': True # News articles are relevant to human-targeted attacks
+                'is_human_targeted': True
             })
             
     return pd.DataFrame(all_articles)
@@ -270,242 +428,242 @@ class ThreatIntelligence:
     
     # MITRE ATT&CK Techniques with descriptions
     ATTACK_TECHNIQUES = {
-    'T1566': {
-        'name': 'Phishing',
-        'category': 'Initial Access',
-        'severity': 'High',
-        'description': 'Adversaries send fraudulent messages to trick users into revealing sensitive information or executing malicious code.',
-        'platforms': ['Windows', 'macOS', 'Linux', 'Email', 'Web'],
-        'permissions_required': 'User interaction (none to low)',
-        'example_behaviors': [
-            'Spearphishing emails with malicious links or attachments',
-            'Credential harvesting via fake login pages',
-            'Malicious HTML or Office documents prompting macros'
-        ],
-        'mitigations': [
-            'User security awareness training and phishing simulations',
-            'Email filtering and attachment sanitization',
-            'Enforce multifactor authentication (MFA) for all remote access',
-            'Block or sandbox risky attachment types and macros by default'
-        ],
-        'detection': {
-            'data_sources': ['Email gateway logs', 'Web proxy logs', 'Endpoint telemetry', 'Authentication logs'],
-            'heuristics': [
-                'Unusual sender-to-recipient patterns (external address spoofing)',
-                'Recipients clicking known-malicious URLs or visiting suspicious domains',
-                'Attachment execution followed by unusual process activity'
-            ]
+        'T1566': {
+            'name': 'Phishing',
+            'category': 'Initial Access',
+            'severity': 'High',
+            'description': 'Adversaries send fraudulent messages to trick users into revealing sensitive information or executing malicious code.',
+            'platforms': ['Windows', 'macOS', 'Linux', 'Email', 'Web'],
+            'permissions_required': 'User interaction (none to low)',
+            'example_behaviors': [
+                'Spearphishing emails with malicious links or attachments',
+                'Credential harvesting via fake login pages',
+                'Malicious HTML or Office documents prompting macros'
+            ],
+            'mitigations': [
+                'User security awareness training and phishing simulations',
+                'Email filtering and attachment sanitization',
+                'Enforce multifactor authentication (MFA) for all remote access',
+                'Block or sandbox risky attachment types and macros by default'
+            ],
+            'detection': {
+                'data_sources': ['Email gateway logs', 'Web proxy logs', 'Endpoint telemetry', 'Authentication logs'],
+                'heuristics': [
+                    'Unusual sender-to-recipient patterns (external address spoofing)',
+                    'Recipients clicking known-malicious URLs or visiting suspicious domains',
+                    'Attachment execution followed by unusual process activity'
+                ]
+            },
+            'related_techniques': ['T1078', 'T1193', 'T1204'],
+            'notes': 'Phishing is a common initial vector – defenses should combine prevention, detection, and rapid response (credential resets, log analysis).'
         },
-        'related_techniques': ['T1078', 'T1193', 'T1204'],
-        'notes': 'Phishing is a common initial vector — defenses should combine prevention, detection, and rapid response (credential resets, log analysis).'
-    },
 
-    'T1486': {
-        'name': 'Data Encrypted for Impact',
-        'category': 'Impact',
-        'severity': 'Critical',
-        'description': 'Adversaries encrypt data on target systems to interrupt availability. Commonly seen in ransomware attacks.',
-        'platforms': ['Windows', 'Linux', 'Network Attached Storage', 'Cloud storage'],
-        'permissions_required': 'Local admin / high privilege typically required to mass-encrypt',
-        'example_behaviors': [
-            'Rapid file rename/encryption across multiple hosts or shares',
-            'Creation of ransom notes on directories',
-            'Deletion of backups or snapshot manipulation prior to encryption'
-        ],
-        'mitigations': [
-            'Maintain offline and immutable backups; test restores regularly',
-            'Least privilege access controls and segmentation (limit lateral movement)',
-            'Apply endpoint protection with ransomware-specific detections and EDR roll-back features',
-            'Harden backup systems and restrict access to snapshot APIs'
-        ],
-        'detection': {
-            'data_sources': ['File system monitoring', 'EDR process and file events', 'SIEM alerts', 'Backup system logs'],
-            'heuristics': [
-                'Large numbers of file modification events with file content changes and new file extensions',
-                'Processes spawning mass file I/O after privilege escalation',
-                'Deletions of snapshot/backup-related files or API calls to backup services from unusual accounts'
-            ]
+        'T1486': {
+            'name': 'Data Encrypted for Impact',
+            'category': 'Impact',
+            'severity': 'Critical',
+            'description': 'Adversaries encrypt data on target systems to interrupt availability. Commonly seen in ransomware attacks.',
+            'platforms': ['Windows', 'Linux', 'Network Attached Storage', 'Cloud storage'],
+            'permissions_required': 'Local admin / high privilege typically required to mass-encrypt',
+            'example_behaviors': [
+                'Rapid file rename/encryption across multiple hosts or shares',
+                'Creation of ransom notes on directories',
+                'Deletion of backups or snapshot manipulation prior to encryption'
+            ],
+            'mitigations': [
+                'Maintain offline and immutable backups; test restores regularly',
+                'Least privilege access controls and segmentation (limit lateral movement)',
+                'Apply endpoint protection with ransomware-specific detections and EDR roll-back features',
+                'Harden backup systems and restrict access to snapshot APIs'
+            ],
+            'detection': {
+                'data_sources': ['File system monitoring', 'EDR process and file events', 'SIEM alerts', 'Backup system logs'],
+                'heuristics': [
+                    'Large numbers of file modification events with file content changes and new file extensions',
+                    'Processes spawning mass file I/O after privilege escalation',
+                    'Deletions of snapshot/backup-related files or API calls to backup services from unusual accounts'
+                ]
+            },
+            'related_techniques': ['T1489', 'T1490', 'T1078'],
+            'notes': 'Focus on resilience (backups + segmentation) and rapid containment; avoid paying ransoms where possible and involve incident response/legal teams.'
         },
-        'related_techniques': ['T1489', 'T1490', 'T1078'],
-        'notes': 'Focus on resilience (backups + segmentation) and rapid containment; avoid paying ransoms where possible and involve incident response/legal teams.'
-    },
 
-    'T1498': {
-        'name': 'Network Denial of Service',
-        'category': 'Impact',
-        'severity': 'High',
-        'description': 'Adversaries perform DoS/DDoS attacks to degrade or block availability of targeted resources.',
-        'platforms': ['Network infrastructure', 'Cloud services', 'Web applications'],
-        'permissions_required': 'None — external network access sufficient',
-        'example_behaviors': [
-            'Volumetric traffic floods to saturate bandwidth',
-            'Application-layer request floods (HTTP GET/POST floods)',
-            'Protocol or state-exhaustion attacks (SYN floods, DNS amplification)'
-        ],
-        'mitigations': [
-            'Use DDoS protection and scrubbing services (cloud or upstream ISP)',
-            'Rate limiting, application-level throttling and caching',
-            'Design for redundancy and elastic scaling (where appropriate)',
-            'Implement network filtering and ACLs to drop malicious traffic'
-        ],
-        'detection': {
-            'data_sources': ['Network flow logs (NetFlow/sFlow)', 'Firewalls', 'WAF logs', 'Cloud provider telemetry'],
-            'heuristics': [
-                'Rapid spike in inbound traffic volume from many sources',
-                'High error rates or slow response times on services',
-                'Unusual distribution of source IPs or repeated identical requests'
-            ]
+        'T1498': {
+            'name': 'Network Denial of Service',
+            'category': 'Impact',
+            'severity': 'High',
+            'description': 'Adversaries perform DoS/DDoS attacks to degrade or block availability of targeted resources.',
+            'platforms': ['Network infrastructure', 'Cloud services', 'Web applications'],
+            'permissions_required': 'None – external network access sufficient',
+            'example_behaviors': [
+                'Volumetric traffic floods to saturate bandwidth',
+                'Application-layer request floods (HTTP GET/POST floods)',
+                'Protocol or state-exhaustion attacks (SYN floods, DNS amplification)'
+            ],
+            'mitigations': [
+                'Use DDoS protection and scrubbing services (cloud or upstream ISP)',
+                'Rate limiting, application-level throttling and caching',
+                'Design for redundancy and elastic scaling (where appropriate)',
+                'Implement network filtering and ACLs to drop malicious traffic'
+            ],
+            'detection': {
+                'data_sources': ['Network flow logs (NetFlow/sFlow)', 'Firewalls', 'WAF logs', 'Cloud provider telemetry'],
+                'heuristics': [
+                    'Rapid spike in inbound traffic volume from many sources',
+                    'High error rates or slow response times on services',
+                    'Unusual distribution of source IPs or repeated identical requests'
+                ]
+            },
+            'related_techniques': ['T1499', 'T1531'],
+            'notes': 'Preparation (contracts with providers, runbooks) is key – operational playbooks reduce downtime during an attack.'
         },
-        'related_techniques': ['T1499', 'T1531'],
-        'notes': 'Preparation (contracts with providers, runbooks) is key — operational playbooks reduce downtime during an attack.'
-    },
 
-    'T1190': {
-        'name': 'Exploit Public-Facing Application',
-        'category': 'Initial Access',
-        'severity': 'High',
-        'description': 'Adversaries exploit weaknesses in internet-facing applications to gain initial access.',
-        'platforms': ['Web servers', 'APIs', 'Application frameworks', 'Cloud services'],
-        'permissions_required': 'None initially; may lead to privilege escalation',
-        'example_behaviors': [
-            'Failed and successful exploit attempts against known CVEs',
-            'Web application error chains and unusual parameter values',
-            'New service or web shell deployed after exploitation'
-        ],
-        'mitigations': [
-            'Timely patch management and vulnerability scanning',
-            'Web application firewalls (WAF) and input validation',
-            'Network segmentation of public-facing apps from internal assets',
-            'Threat modeling and secure SDLC practices'
-        ],
-        'detection': {
-            'data_sources': ['Web server logs', 'WAF logs', 'Host EDR', 'Vulnerability scan results'],
-            'heuristics': [
-                'Patterned exploit attempts (fuzzing-like requests, unusual user agents)',
-                'Unexpected process creation or reverse shells from web servers',
-                'Out-of-band changes to application files or database contents'
-            ]
+        'T1190': {
+            'name': 'Exploit Public-Facing Application',
+            'category': 'Initial Access',
+            'severity': 'High',
+            'description': 'Adversaries exploit weaknesses in internet-facing applications to gain initial access.',
+            'platforms': ['Web servers', 'APIs', 'Application frameworks', 'Cloud services'],
+            'permissions_required': 'None initially; may lead to privilege escalation',
+            'example_behaviors': [
+                'Failed and successful exploit attempts against known CVEs',
+                'Web application error chains and unusual parameter values',
+                'New service or web shell deployed after exploitation'
+            ],
+            'mitigations': [
+                'Timely patch management and vulnerability scanning',
+                'Web application firewalls (WAF) and input validation',
+                'Network segmentation of public-facing apps from internal assets',
+                'Threat modeling and secure SDLC practices'
+            ],
+            'detection': {
+                'data_sources': ['Web server logs', 'WAF logs', 'Host EDR', 'Vulnerability scan results'],
+                'heuristics': [
+                    'Patterned exploit attempts (fuzzing-like requests, unusual user agents)',
+                    'Unexpected process creation or reverse shells from web servers',
+                    'Out-of-band changes to application files or database contents'
+                ]
+            },
+            'related_techniques': ['T1505', 'T1210', 'T1078'],
+            'notes': 'Prioritize patching high-risk internet-facing assets and monitor for anomalous web traffic and post-exploit artifacts.'
         },
-        'related_techniques': ['T1505', 'T1210', 'T1078'],
-        'notes': 'Prioritize patching high-risk internet-facing assets and monitor for anomalous web traffic and post-exploit artifacts.'
-    },
 
-    'T1059': {
-        'name': 'Command and Scripting Interpreter',
-        'category': 'Execution',
-        'severity': 'Medium',
-        'description': 'Adversaries abuse command and script interpreters to execute commands and scripts.',
-        'platforms': ['Windows (PowerShell, cmd)', 'Linux/macOS (bash, sh, python)'],
-        'permissions_required': 'User-level to elevated depending on action',
-        'example_behaviors': [
-            'Invocation of PowerShell with encoded commands',
-            'Use of scripting languages to download and execute payloads',
-            'Scheduling tasks or cronjobs to maintain persistence'
-        ],
-        'mitigations': [
-            'Constrain use of interpreters with application control / allowlisting',
-            'Enable logging of command interpreter activity (PowerShell module logging, bash audit)',
-            'Harden endpoints to reduce script execution by untrusted users'
-        ],
-        'detection': {
-            'data_sources': ['Process command-line logging', 'Script block logging', 'EDR process telemetry', 'Sysmon'],
-            'heuristics': [
-                'Unusual CLI flags or long/encoded command lines',
-                'Interpreter processes spawning network connections or writing executables',
-                'Child processes typical of payload staging (e.g., curl/wget followed by execution)'
-            ]
+        'T1059': {
+            'name': 'Command and Scripting Interpreter',
+            'category': 'Execution',
+            'severity': 'Medium',
+            'description': 'Adversaries abuse command and script interpreters to execute commands and scripts.',
+            'platforms': ['Windows (PowerShell, cmd)', 'Linux/macOS (bash, sh, python)'],
+            'permissions_required': 'User-level to elevated depending on action',
+            'example_behaviors': [
+                'Invocation of PowerShell with encoded commands',
+                'Use of scripting languages to download and execute payloads',
+                'Scheduling tasks or cronjobs to maintain persistence'
+            ],
+            'mitigations': [
+                'Constrain use of interpreters with application control / allowlisting',
+                'Enable logging of command interpreter activity (PowerShell module logging, bash audit)',
+                'Harden endpoints to reduce script execution by untrusted users'
+            ],
+            'detection': {
+                'data_sources': ['Process command-line logging', 'Script block logging', 'EDR process telemetry', 'Sysmon'],
+                'heuristics': [
+                    'Unusual CLI flags or long/encoded command lines',
+                    'Interpreter processes spawning network connections or writing executables',
+                    'Child processes typical of payload staging (e.g., curl/wget followed by execution)'
+                ]
+            },
+            'related_techniques': ['T1204', 'T1218'],
+            'notes': 'Scripting is commonly used for both benign admin tasks and malicious activity – robust logging + allowlisting reduce risk.'
         },
-        'related_techniques': ['T1204', 'T1218'],
-        'notes': 'Scripting is commonly used for both benign admin tasks and malicious activity — robust logging + allowlisting reduce risk.'
-    },
 
-    'T1055': {
-        'name': 'Process Injection',
-        'category': 'Defense Evasion',
-        'severity': 'High',
-        'description': 'Adversaries inject code into processes to evade defenses and elevate privileges.',
-        'platforms': ['Windows', 'Linux', 'macOS'],
-        'permissions_required': 'Typically requires local privileges (may be possible from user context in some cases)',
-        'example_behaviors': [
-            'DLL injection or reflective loading into legitimate processes',
-            'Remote thread creation and memory modification of another process',
-            'Use of legitimate system processes to host malicious code'
-        ],
-        'mitigations': [
-            'Enable EDR with heuristics for memory and injection behaviors',
-            'Disable unnecessary services and harden process permissions',
-            'Use code-signing and integrity protections where possible'
-        ],
-        'detection': {
-            'data_sources': ['EDR memory scan, process create/modify logs, sysmon', 'Audit logs'],
-            'heuristics': [
-                'Unexpected modules loaded into high-trust processes',
-                'Processes with injected memory regions that contain executable code but no on-disk counterpart',
-                'Creation of remote threads or suspicious API calls (e.g., WriteProcessMemory / CreateRemoteThread)'
-            ]
+        'T1055': {
+            'name': 'Process Injection',
+            'category': 'Defense Evasion',
+            'severity': 'High',
+            'description': 'Adversaries inject code into processes to evade defenses and elevate privileges.',
+            'platforms': ['Windows', 'Linux', 'macOS'],
+            'permissions_required': 'Typically requires local privileges (may be possible from user context in some cases)',
+            'example_behaviors': [
+                'DLL injection or reflective loading into legitimate processes',
+                'Remote thread creation and memory modification of another process',
+                'Use of legitimate system processes to host malicious code'
+            ],
+            'mitigations': [
+                'Enable EDR with heuristics for memory and injection behaviors',
+                'Disable unnecessary services and harden process permissions',
+                'Use code-signing and integrity protections where possible'
+            ],
+            'detection': {
+                'data_sources': ['EDR memory scan, process create/modify logs, sysmon', 'Audit logs'],
+                'heuristics': [
+                    'Unexpected modules loaded into high-trust processes',
+                    'Processes with injected memory regions that contain executable code but no on-disk counterpart',
+                    'Creation of remote threads or suspicious API calls (e.g., WriteProcessMemory / CreateRemoteThread)'
+                ]
+            },
+            'related_techniques': ['T1218', 'T1574'],
+            'notes': 'Memory-only techniques are harder to detect via file-based controls – focus on behavioral/telemetry-based detection.'
         },
-        'related_techniques': ['T1218', 'T1574'],
-        'notes': 'Memory-only techniques are harder to detect via file-based controls — focus on behavioral/telemetry-based detection.'
-    },
 
-    'T1003': {
-        'name': 'OS Credential Dumping',
-        'category': 'Credential Access',
-        'severity': 'Critical',
-        'description': 'Adversaries attempt to dump credentials to obtain account login information.',
-        'platforms': ['Windows (LSASS, SAM)', 'Linux (sshd, memory)', 'macOS'],
-        'permissions_required': 'Local SYSTEM / admin typically required to access credential stores',
-        'example_behaviors': [
-            'Accessing LSASS memory or using tools to extract hashes',
-            'Reading credential stores or configuration files (e.g., .ssh, keyrings)',
-            'Running tools that enumerate accounts and password hashes'
-        ],
-        'mitigations': [
-            'Restrict administrative privileges and use privileged access workstations',
-            'Use credential protection mechanisms (LSA protection, Windows Defender Credential Guard)',
-            'Rotate and enforce strong authentication, deploy MFA'
-        ],
-        'detection': {
-            'data_sources': ['Process creation logs', 'Memory read events', 'EDR, authentication logs'],
-            'heuristics': [
-                'Processes reading LSASS memory or opening protected credential files',
-                'Unusual account enumeration or repeated authentication failures after enumeration',
-                'Use of known credential-dumping tool binaries or suspicious new services'
-            ]
+        'T1003': {
+            'name': 'OS Credential Dumping',
+            'category': 'Credential Access',
+            'severity': 'Critical',
+            'description': 'Adversaries attempt to dump credentials to obtain account login information.',
+            'platforms': ['Windows (LSASS, SAM)', 'Linux (sshd, memory)', 'macOS'],
+            'permissions_required': 'Local SYSTEM / admin typically required to access credential stores',
+            'example_behaviors': [
+                'Accessing LSASS memory or using tools to extract hashes',
+                'Reading credential stores or configuration files (e.g., .ssh, keyrings)',
+                'Running tools that enumerate accounts and password hashes'
+            ],
+            'mitigations': [
+                'Restrict administrative privileges and use privileged access workstations',
+                'Use credential protection mechanisms (LSA protection, Windows Defender Credential Guard)',
+                'Rotate and enforce strong authentication, deploy MFA'
+            ],
+            'detection': {
+                'data_sources': ['Process creation logs', 'Memory read events', 'EDR, authentication logs'],
+                'heuristics': [
+                    'Processes reading LSASS memory or opening protected credential files',
+                    'Unusual account enumeration or repeated authentication failures after enumeration',
+                    'Use of known credential-dumping tool binaries or suspicious new services'
+                ]
+            },
+            'related_techniques': ['T1555', 'T1078', 'T1489'],
+            'notes': 'Protecting secrets and limiting privileged access materially reduces the impact of credential dumping attempts.'
         },
-        'related_techniques': ['T1555', 'T1078', 'T1489'],
-        'notes': 'Protecting secrets and limiting privileged access materially reduces the impact of credential dumping attempts.'
-    },
 
-    'T1071': {
-        'name': 'Application Layer Protocol',
-        'category': 'Command and Control',
-        'severity': 'Medium',
-        'description': 'Adversaries use application layer protocols for command and control communications.',
-        'platforms': ['Any (HTTP/S, DNS, SMTP, WebSockets)'],
-        'permissions_required': 'None (network connectivity required)',
-        'example_behaviors': [
-            'Beaconing to domain via HTTP/S with periodic callbacks',
-            'Use of DNS queries/responses to tunnel data or receive commands',
-            'Use of legitimate services (cloud storage, social media) as C2 channels'
-        ],
-        'mitigations': [
-            'Network egress filtering and DNS filtering/blocking of suspicious domains',
-            'Proxying outbound traffic and TLS inspection where legally/operationally viable',
-            'Block or monitor uncommon protocols and high-risk external services'
-        ],
-        'detection': {
-            'data_sources': ['Network proxy logs', 'DNS logs', 'NetFlow, EDR network telemetry'],
-            'heuristics': [
-                'Regular periodic outbound connections to low-reputation domains',
-                'High-entropy or encoded payloads in apparently benign protocol fields',
-                'Unusual DNS query patterns or TXT record use for data exfiltration'
-            ]
-        },
-        'related_techniques': ['T1090', 'T1573'],
-        'notes': 'C2 detection benefits from a mix of network and host telemetry; monitoring for anomalous patterns is key.'
+        'T1071': {
+            'name': 'Application Layer Protocol',
+            'category': 'Command and Control',
+            'severity': 'Medium',
+            'description': 'Adversaries use application layer protocols for command and control communications.',
+            'platforms': ['Any (HTTP/S, DNS, SMTP, WebSockets)'],
+            'permissions_required': 'None (network connectivity required)',
+            'example_behaviors': [
+                'Beaconing to domain via HTTP/S with periodic callbacks',
+                'Use of DNS queries/responses to tunnel data or receive commands',
+                'Use of legitimate services (cloud storage, social media) as C2 channels'
+            ],
+            'mitigations': [
+                'Network egress filtering and DNS filtering/blocking of suspicious domains',
+                'Proxying outbound traffic and TLS inspection where legally/operationally viable',
+                'Block or monitor uncommon protocols and high-risk external services'
+            ],
+            'detection': {
+                'data_sources': ['Network proxy logs', 'DNS logs', 'NetFlow, EDR network telemetry'],
+                'heuristics': [
+                    'Regular periodic outbound connections to low-reputation domains',
+                    'High-entropy or encoded payloads in apparently benign protocol fields',
+                    'Unusual DNS query patterns or TXT record use for data exfiltration'
+                ]
+            },
+            'related_techniques': ['T1090', 'T1573'],
+            'notes': 'C2 detection benefits from a mix of network and host telemetry; monitoring for anomalous patterns is key.'
+        }
     }
-}
     
     # Cyber Kill Chain phases with descriptions
     KILL_CHAIN_PHASES = {
@@ -595,56 +753,47 @@ class ThreatIntelligence:
     
     # Countries
     COUNTRIES = {
-    # Already in your list
-    'USA': {'lat': 39.0, 'lon': -98.0, 'risk_level': 0.8},
-    'UK': {'lat': 54.0, 'lon': -2.0, 'risk_level': 0.7},
-    'Germany': {'lat': 51.0, 'lon': 10.5, 'risk_level': 0.7},
-    'Japan': {'lat': 36.0, 'lon': 138.0, 'risk_level': 0.6},
-    'Australia': {'lat': -25.0, 'lon': 135.0, 'risk_level': 0.6},
-    'Canada': {'lat': 56.0, 'lon': -106.0, 'risk_level': 0.5},
-    'France': {'lat': 47.0, 'lon': 2.0, 'risk_level': 0.7},
-    'India': {'lat': 20.0, 'lon': 77.0, 'risk_level': 0.7},
-    'Brazil': {'lat': -14.0, 'lon': -51.0, 'risk_level': 0.6},
-    'Russia': {'lat': 61.0, 'lon': 105.0, 'risk_level': 0.9},
-    'China': {'lat': 35.0, 'lon': 105.0, 'risk_level': 0.8},
-    'Israel': {'lat': 31.0, 'lon': 35.0, 'risk_level': 0.8},
-    'Portugal': {'lat': 39.5, 'lon': -8.0, 'risk_level': 0.5},
-    'Spain': {'lat': 40.0, 'lon': -4.0, 'risk_level': 0.6},
-    'Italy': {'lat': 42.5, 'lon': 12.5, 'risk_level': 0.6},
-
-    # Nordic countries
-    'Denmark': {'lat': 56.0, 'lon': 10.0, 'risk_level': 0.5},
-    'Finland': {'lat': 64.0, 'lon': 26.0, 'risk_level': 0.6},
-    'Iceland': {'lat': 65.0, 'lon': -18.0, 'risk_level': 0.4},
-    'Norway': {'lat': 61.0, 'lon': 8.0, 'risk_level': 0.6},
-    'Sweden': {'lat': 63.0, 'lon': 16.0, 'risk_level': 0.6},
-
-    # Baltic countries
-    'Estonia': {'lat': 59.0, 'lon': 26.0, 'risk_level': 0.5},
-    'Latvia': {'lat': 57.0, 'lon': 25.0, 'risk_level': 0.5},
-    'Lithuania': {'lat': 55.0, 'lon': 24.0, 'risk_level': 0.5},
-
-    # Vietnam
-    'Vietnam': {'lat': 14.0, 'lon': 108.0, 'risk_level': 0.6},
-
-    # Remaining EU members (some duplicates above, but listed for completeness)
-    'Austria': {'lat': 47.5, 'lon': 14.5, 'risk_level': 0.6},
-    'Belgium': {'lat': 50.8, 'lon': 4.5, 'risk_level': 0.6},
-    'Bulgaria': {'lat': 42.7, 'lon': 25.5, 'risk_level': 0.6},
-    'Croatia': {'lat': 45.1, 'lon': 15.2, 'risk_level': 0.6},
-    'Cyprus': {'lat': 35.0, 'lon': 33.0, 'risk_level': 0.5},
-    'Czech Republic': {'lat': 49.8, 'lon': 15.5, 'risk_level': 0.6},
-    'Greece': {'lat': 39.0, 'lon': 22.0, 'risk_level': 0.6},
-    'Hungary': {'lat': 47.2, 'lon': 19.5, 'risk_level': 0.6},
-    'Ireland': {'lat': 53.0, 'lon': -8.0, 'risk_level': 0.5},
-    'Luxembourg': {'lat': 49.8, 'lon': 6.1, 'risk_level': 0.5},
-    'Malta': {'lat': 35.9, 'lon': 14.5, 'risk_level': 0.4},
-    'Netherlands': {'lat': 52.0, 'lon': 5.5, 'risk_level': 0.6},
-    'Poland': {'lat': 52.0, 'lon': 19.0, 'risk_level': 0.6},
-    'Romania': {'lat': 45.9, 'lon': 25.0, 'risk_level': 0.6},
-    'Slovakia': {'lat': 48.7, 'lon': 19.7, 'risk_level': 0.6},
-    'Slovenia': {'lat': 46.1, 'lon': 14.8, 'risk_level': 0.5}
-}
+        'USA': {'lat': 39.0, 'lon': -98.0, 'risk_level': 0.8},
+        'UK': {'lat': 54.0, 'lon': -2.0, 'risk_level': 0.7},
+        'Germany': {'lat': 51.0, 'lon': 10.5, 'risk_level': 0.7},
+        'Japan': {'lat': 36.0, 'lon': 138.0, 'risk_level': 0.6},
+        'Australia': {'lat': -25.0, 'lon': 135.0, 'risk_level': 0.6},
+        'Canada': {'lat': 56.0, 'lon': -106.0, 'risk_level': 0.5},
+        'France': {'lat': 47.0, 'lon': 2.0, 'risk_level': 0.7},
+        'India': {'lat': 20.0, 'lon': 77.0, 'risk_level': 0.7},
+        'Brazil': {'lat': -14.0, 'lon': -51.0, 'risk_level': 0.6},
+        'Russia': {'lat': 61.0, 'lon': 105.0, 'risk_level': 0.9},
+        'China': {'lat': 35.0, 'lon': 105.0, 'risk_level': 0.8},
+        'Israel': {'lat': 31.0, 'lon': 35.0, 'risk_level': 0.8},
+        'Portugal': {'lat': 39.5, 'lon': -8.0, 'risk_level': 0.5},
+        'Spain': {'lat': 40.0, 'lon': -4.0, 'risk_level': 0.6},
+        'Italy': {'lat': 42.5, 'lon': 12.5, 'risk_level': 0.6},
+        'Denmark': {'lat': 56.0, 'lon': 10.0, 'risk_level': 0.5},
+        'Finland': {'lat': 64.0, 'lon': 26.0, 'risk_level': 0.6},
+        'Iceland': {'lat': 65.0, 'lon': -18.0, 'risk_level': 0.4},
+        'Norway': {'lat': 61.0, 'lon': 8.0, 'risk_level': 0.6},
+        'Sweden': {'lat': 63.0, 'lon': 16.0, 'risk_level': 0.6},
+        'Estonia': {'lat': 59.0, 'lon': 26.0, 'risk_level': 0.5},
+        'Latvia': {'lat': 57.0, 'lon': 25.0, 'risk_level': 0.5},
+        'Lithuania': {'lat': 55.0, 'lon': 24.0, 'risk_level': 0.5},
+        'Vietnam': {'lat': 14.0, 'lon': 108.0, 'risk_level': 0.6},
+        'Austria': {'lat': 47.5, 'lon': 14.5, 'risk_level': 0.6},
+        'Belgium': {'lat': 50.8, 'lon': 4.5, 'risk_level': 0.6},
+        'Bulgaria': {'lat': 42.7, 'lon': 25.5, 'risk_level': 0.6},
+        'Croatia': {'lat': 45.1, 'lon': 15.2, 'risk_level': 0.6},
+        'Cyprus': {'lat': 35.0, 'lon': 33.0, 'risk_level': 0.5},
+        'Czech Republic': {'lat': 49.8, 'lon': 15.5, 'risk_level': 0.6},
+        'Greece': {'lat': 39.0, 'lon': 22.0, 'risk_level': 0.6},
+        'Hungary': {'lat': 47.2, 'lon': 19.5, 'risk_level': 0.6},
+        'Ireland': {'lat': 53.0, 'lon': -8.0, 'risk_level': 0.5},
+        'Luxembourg': {'lat': 49.8, 'lon': 6.1, 'risk_level': 0.5},
+        'Malta': {'lat': 35.9, 'lon': 14.5, 'risk_level': 0.4},
+        'Netherlands': {'lat': 52.0, 'lon': 5.5, 'risk_level': 0.6},
+        'Poland': {'lat': 52.0, 'lon': 19.0, 'risk_level': 0.6},
+        'Romania': {'lat': 45.9, 'lon': 25.0, 'risk_level': 0.6},
+        'Slovakia': {'lat': 48.7, 'lon': 19.7, 'risk_level': 0.6},
+        'Slovenia': {'lat': 46.1, 'lon': 14.8, 'risk_level': 0.5}
+    }
     
     @staticmethod
     def generate_threat_event():
@@ -698,6 +847,7 @@ def get_security_recommendations(threat_data):
     
     top_techniques = threat_data['technique_name'].value_counts().head(3)
     top_sectors = threat_data['target_sector'].value_counts().head(3)
+    critical_threats = len(threat_data[threat_data['severity'] == 'Critical'])
     
     recommendations = []
     
@@ -708,11 +858,11 @@ def get_security_recommendations(threat_data):
         'title': 'Information Security Management System (ISMS) Review',
         'threat': f'Multiple threat vectors detected across {len(threat_data["technique_name"].unique())} attack types',
         'controls': [
-            '🔸 A.12.1.1 - Documented operating procedures',
-            '🔸 A.12.6.1 - Management of technical vulnerabilities',
-            '🔸 A.13.1.1 - Network controls and segmentation',
-            '🔸 A.14.2.9 - System acceptance testing',
-            '🔸 A.16.1.1 - Incident response procedures'
+            '• A.12.1.1 - Documented operating procedures',
+            '• A.12.6.1 - Management of technical vulnerabilities',
+            '• A.13.1.1 - Network controls and segmentation',
+            '• A.14.2.9 - System acceptance testing',
+            '• A.16.1.1 - Incident response procedures'
         ]
     })
     
@@ -721,13 +871,13 @@ def get_security_recommendations(threat_data):
         'framework': 'NIST CSF',
         'priority': 'CRITICAL',
         'title': 'NIST Framework Core Functions Activation',
-        'threat': f'Critical threats detected: {len(threat_data[threat_data["severity"] == "Critical"])} instances',
+        'threat': f'Critical threats detected: {critical_threats} instances',
         'controls': [
-            '🔸 IDENTIFY (ID.RA): Conduct immediate risk assessment',
-            '🔸 PROTECT (PR.AC): Strengthen access control measures',
-            '🔸 DETECT (DE.CM): Enhance continuous monitoring',
-            '🔸 RESPOND (RS.AN): Activate incident analysis procedures',
-            '🔸 RECOVER (RC.RP): Update recovery planning'
+            '• IDENTIFY (ID.RA): Conduct immediate risk assessment',
+            '• PROTECT (PR.AC): Strengthen access control measures',
+            '• DETECT (DE.CM): Enhance continuous monitoring',
+            '• RESPOND (RS.AN): Activate incident analysis procedures',
+            '• RECOVER (RC.RP): Update recovery planning'
         ]
     })
     
@@ -740,11 +890,11 @@ def get_security_recommendations(threat_data):
                 'title': 'Email Security Enhancement',
                 'threat': f'Phishing attacks: {count} instances detected',
                 'controls': [
-                    '🔸 Implement DMARC policy with p=reject',
-                    '🔸 Deploy DKIM signing for all domains',
-                    '🔸 Configure SPF records with -all',
-                    '🔸 Enable ATP/Safe Links protection',
-                    '🔸 Conduct phishing simulation training (NIST SP 800-50)'
+                    '• Implement DMARC policy with p=reject',
+                    '• Deploy DKIM signing for all domains',
+                    '• Configure SPF records with -all',
+                    '• Enable ATP/Safe Links protection',
+                    '• Conduct phishing simulation training (NIST SP 800-50)'
                 ]
             })
     
@@ -796,7 +946,7 @@ def create_3d_globe_threats(threat_df):
                 size=globe_df['total'] / 10,
                 color=globe_df['critical'],
                 colorscale=[[0, '#00ff00'], [0.5, '#ffff00'], [1, '#ff0000']],
-                showscale=False,  # Remove the color scale ruler
+                showscale=False,
                 line=dict(width=1, color='#00ffff'),
                 sizemin=5,
                 sizemode='diameter'
@@ -940,39 +1090,6 @@ def create_trend_analysis_charts(threat_df, attack_type=None, country=None, sect
     return fig
 
 # ============================================================================
-# POPUP MODAL FUNCTIONS
-# ============================================================================
-
-def show_threat_details_popup(threats_df, filter_type='all'):
-    """Display threat details in a popup-style expander"""
-    
-    with st.expander(f"📋 Threat Details - {filter_type}", expanded=True):
-        if filter_type == 'critical':
-            display_df = threats_df[threats_df['severity'] == 'Critical']
-        elif filter_type == 'active':
-            display_df = threats_df[threats_df['active'] == True]
-        else:
-            display_df = threats_df
-        
-        # Display summary
-        st.markdown(f"""
-        <div style="padding: 10px; background: rgba(20, 25, 47, 0.7); border: 1px solid #00ffff; border-radius: 10px; margin-bottom: 10px;">
-            <span style="color: #00ffff; font-weight: bold;">Total Threats:</span> {len(display_df)} | 
-            <span style="color: #ff0000; font-weight: bold;">Critical:</span> {len(display_df[display_df['severity'] == 'Critical'])} | 
-            <span style="color: #ffff00; font-weight: bold;">Active:</span> {len(display_df[display_df['active'] == True])}
-        </div>
-        """, unsafe_allow_html=True)
-        
-        # Display detailed table
-        if not display_df.empty:
-            st.dataframe(
-                display_df[['threat_id', 'timestamp', 'technique_name', 'severity', 
-                           'target_country', 'target_sector', 'confidence', 'active']].head(50),
-                use_container_width=True,
-                height=400
-            )
-
-# ============================================================================
 # MAIN APPLICATION
 # ============================================================================
 
@@ -993,7 +1110,7 @@ def main():
     
     # Calculate time until next update
     seconds_since_update = (datetime.now() - st.session_state.last_update).total_seconds()
-    seconds_until_next = 300 - seconds_since_update  # 5 minutes = 300 seconds
+    seconds_until_next = 300 - seconds_since_update
     minutes_until_next = int(seconds_until_next // 60)
     seconds_remainder = int(seconds_until_next % 60)
     
@@ -1005,10 +1122,10 @@ def main():
                 box-shadow: 0 0 40px rgba(0, 255, 255, 0.2);">
         <h1 style="margin: 0;">THREAT INTELLIGENCE PLATFORM</h1>
         <p style="color: #b8bcc8; font-size: 1.1em; margin-top: 10px; letter-spacing: 2px;">
-            REAL-TIME THREAT DETECTION • AUTO-UPDATING FEEDS • PREDICTIVE ANALYTICS
+            REAL-TIME THREAT DETECTION • AUTO-UPDATING FEEDS • ML-POWERED ANALYTICS
         </p>
         <p style="color: #00ff00; font-size: 0.9em; margin-top: 5px;">
-            🟢 FEEDS AUTO-UPDATE EVERY 5 MINUTES | Last Update: {st.session_state.last_update.strftime('%H:%M:%S')} | 
+            FEEDS AUTO-UPDATE EVERY 5 MINUTES | Last Update: {st.session_state.last_update.strftime('%H:%M:%S')} | 
             Next Update in: {minutes_until_next}m {seconds_remainder}s
         </p>
     </div>
@@ -1024,7 +1141,7 @@ def main():
         """, unsafe_allow_html=True)
         
         # Time Range Selection with Date Picker
-        st.markdown("### ⏰ TIME RANGE")
+        st.markdown("### TIME RANGE")
         time_option = st.radio(
             "Select time range option",
             options=['Quick Select', 'Custom Range'],
@@ -1035,9 +1152,8 @@ def main():
             time_range = st.selectbox(
                 "Quick time ranges",
                 options=['Last 1 Hour', 'Last 6 Hours', 'Last 24 Hours', 'Last 7 Days', 'Last 30 Days'],
-                index=3  # Default to Last 7 Days
+                index=3
             )
-            # Map time range to filter
             time_map = {
                 'Last 1 Hour': timedelta(hours=1),
                 'Last 6 Hours': timedelta(hours=6),
@@ -1062,18 +1178,16 @@ def main():
                     value=datetime.now(),
                     max_value=datetime.now()
                 )
-            # Convert to datetime for filtering
             time_cutoff = datetime.combine(start_date, datetime.min.time())
             end_datetime = datetime.combine(end_date, datetime.max.time())
         
         st.markdown("---")
         
-        # Attack Type Filter - All selected by default
-        st.markdown("### 🎯 ATTACK TYPE")
+        # Attack Type Filter
+        st.markdown("### ATTACK TYPE")
         attack_types = list(ThreatIntelligence.ATTACK_TECHNIQUES.values())
         attack_type_names = [attack['name'] for attack in attack_types]
         
-        # Select/Deselect All buttons
         col1, col2 = st.columns(2)
         with col1:
             if st.button("Select All", key="select_all_attacks"):
@@ -1083,7 +1197,7 @@ def main():
                 st.session_state.selected_attacks = []
         
         if 'selected_attacks' not in st.session_state:
-            st.session_state.selected_attacks = attack_type_names  # All selected by default
+            st.session_state.selected_attacks = attack_type_names
         
         selected_attacks = st.multiselect(
             "Click to deselect",
@@ -1093,8 +1207,8 @@ def main():
         )
         st.session_state.selected_attacks = selected_attacks
         
-        # Target Country Filter - All selected by default
-        st.markdown("### 🌍 TARGET COUNTRY")
+        # Target Country Filter
+        st.markdown("### TARGET COUNTRY")
         countries = list(ThreatIntelligence.COUNTRIES.keys())
         
         col1, col2 = st.columns(2)
@@ -1106,7 +1220,7 @@ def main():
                 st.session_state.selected_countries = []
         
         if 'selected_countries' not in st.session_state:
-            st.session_state.selected_countries = countries  # All selected by default
+            st.session_state.selected_countries = countries
         
         selected_countries = st.multiselect(
             "Click to deselect",
@@ -1116,8 +1230,8 @@ def main():
         )
         st.session_state.selected_countries = selected_countries
         
-        # Sector Filter - All selected by default
-        st.markdown("### 🏢 TARGET SECTOR")
+        # Sector Filter
+        st.markdown("### TARGET SECTOR")
         sectors = ThreatIntelligence.SECTORS
         
         col1, col2 = st.columns(2)
@@ -1129,7 +1243,7 @@ def main():
                 st.session_state.selected_sectors = []
         
         if 'selected_sectors' not in st.session_state:
-            st.session_state.selected_sectors = sectors  # All selected by default
+            st.session_state.selected_sectors = sectors
         
         selected_sectors = st.multiselect(
             "Click to deselect",
@@ -1139,12 +1253,12 @@ def main():
         )
         st.session_state.selected_sectors = selected_sectors
         
-        # Severity Filter - All selected by default
-        st.markdown("### ⚠️ SEVERITY")
+        # Severity Filter
+        st.markdown("### SEVERITY")
         severity_options = ['Critical', 'High', 'Medium', 'Low']
         
         if 'selected_severity' not in st.session_state:
-            st.session_state.selected_severity = severity_options  # All selected by default
+            st.session_state.selected_severity = severity_options
         
         severity_levels = st.multiselect(
             "Severity levels",
@@ -1155,7 +1269,7 @@ def main():
         st.session_state.selected_severity = severity_levels
         
         # Confidence threshold
-        st.markdown("### 🎯 CONFIDENCE")
+        st.markdown("### CONFIDENCE")
         confidence_threshold = st.slider(
             "Minimum Confidence (%)",
             min_value=0,
@@ -1166,7 +1280,7 @@ def main():
         
         st.markdown("---")
         
-        if st.button("🔄 APPLY FILTERS", use_container_width=True, type="primary"):
+        if st.button("APPLY FILTERS", use_container_width=True, type="primary"):
             st.rerun()
     
     # Apply filters to data
@@ -1181,19 +1295,18 @@ def main():
     
     # Main Dashboard Tabs
     main_tabs = st.tabs([
-        "🎯 Threat Overview",
-        "👤 Human Targeted",
-        "🌍 Global Threats",
-        "📊 Intelligence Analysis",
-        "💡 Security Recommendations",
-        "📈 Trend Analysis",
-        "🔍 IOC Scanner",
+        "Threat Overview",
+        "Human Targeted",
+        "Global Threats",
+        "ML Intelligence Analysis",
+        "ML Trend Analysis",
+        "IOC Scanner",
     ])
     
     # Tab 1: Threat Overview
     with main_tabs[0]:
         # Key Metrics
-        st.markdown("### 📊 KEY THREAT METRICS")
+        st.markdown("### KEY THREAT METRICS")
         
         metric_cols = st.columns(7)
         
@@ -1220,10 +1333,9 @@ def main():
         with metric_cols[6]:
             st.metric("Sectors", f"{affected_sectors}")
         
-        # Live Threat Feed with proper styling
-        st.markdown("### 🔴 LIVE THREAT FEED")
+        # Live Threat Feed
+        st.markdown("### LIVE THREAT FEED")
         
-        # Create a container for the scrollable feed
         feed_container = st.container()
         with feed_container:
             recent_threats = threat_df.nlargest(20, 'timestamp') if not threat_df.empty else pd.DataFrame()
@@ -1236,18 +1348,16 @@ def main():
                     'Low': '#00ff00'
                 }[threat['severity']]
                 
-                status = '🛡️ BLOCKED' if threat['blocked'] else '⚠️ ACTIVE'
+                status = 'BLOCKED' if threat['blocked'] else 'ACTIVE'
                 status_color = '#00ff00' if threat['blocked'] else '#ff0000'
                 
-                # Create properly styled threat cards
                 with st.container():
                     st.markdown(f"""
                     <div style="padding: 15px; margin: 10px 0; 
                                 background: linear-gradient(135deg, rgba(20, 25, 47, 0.8), rgba(30, 35, 57, 0.6));
                                 border-left: 4px solid {severity_color}; 
                                 border-radius: 10px;
-                                box-shadow: 0 2px 10px rgba(0, 0, 0, 0.3);
-                                transition: all 0.3s ease;">
+                                box-shadow: 0 2px 10px rgba(0, 0, 0, 0.3);">
                         <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
                             <div style="display: flex; align-items: center; gap: 15px;">
                                 <span style="background: {severity_color}; color: white; 
@@ -1282,16 +1392,14 @@ def main():
                     """, unsafe_allow_html=True)
         
         # Charts
-        st.markdown("### 📊 THREAT ANALYTICS")
+        st.markdown("### THREAT ANALYTICS")
         
         chart_col1, chart_col2 = st.columns(2)
         
         with chart_col1:
-            # Kill Chain with hover descriptions
             st.plotly_chart(create_kill_chain_with_hover(threat_df), use_container_width=True)
         
         with chart_col2:
-            # Severity distribution
             if not threat_df.empty:
                 severity_counts = threat_df['severity'].value_counts()
                 fig_severity = go.Figure(data=[go.Pie(
@@ -1316,37 +1424,29 @@ def main():
     
     # Tab 2: Global Threats
     with main_tabs[2]:
-        st.markdown("### 🌍 GLOBAL THREAT LANDSCAPE")
+        st.markdown("### GLOBAL THREAT LANDSCAPE")
         st.markdown("*Click and drag to rotate the globe. Click on a country to see detailed threat analysis.*")
         
-        # 3D Interactive Globe
         globe_fig = create_3d_globe_threats(threat_df)
-        
-        # Make the globe interactive with click events
         globe_placeholder = st.plotly_chart(globe_fig, use_container_width=True, key="globe_chart")
         
-        # Country selector for detailed view
-        st.markdown("### 📊 SELECT A COUNTRY FOR DETAILED ANALYSIS")
+        st.markdown("### SELECT A COUNTRY FOR DETAILED ANALYSIS")
         
         if not threat_df.empty:
-            # Get list of countries with threats
             countries_with_threats = threat_df['target_country'].unique()
             
-            # Create a selectbox for country selection
             selected_country = st.selectbox(
                 "Choose a country to analyze:",
                 options=['None'] + sorted(countries_with_threats.tolist()),
                 key="country_selector"
             )
             
-            # Show detailed analysis if a country is selected
             if selected_country != 'None':
                 country_threats = threat_df[threat_df['target_country'] == selected_country]
                 
                 if not country_threats.empty:
-                    st.markdown(f"### 🎯 DETAILED THREAT ANALYSIS: {selected_country}")
+                    st.markdown(f"### DETAILED THREAT ANALYSIS: {selected_country}")
                     
-                    # Summary metrics
                     summary_cols = st.columns(6)
                     
                     total = len(country_threats)
@@ -1369,32 +1469,27 @@ def main():
                     with summary_cols[5]:
                         st.metric("Block Rate", f"{block_rate:.1f}%")
                     
-                    # Detailed threat table with better styling
-                    st.markdown("#### 📋 THREAT DETAILS")
+                    st.markdown("#### THREAT DETAILS")
                     
-                    # Prepare display data
                     display_data = country_threats[['timestamp', 'technique_name', 'technique_description', 
                                                    'severity', 'threat_actor', 'target_sector', 
                                                    'blocked', 'active', 'confidence']].copy()
                     display_data['Status'] = display_data.apply(
-                        lambda x: '🛡️ Blocked' if x['blocked'] else '⚠️ Active', axis=1
+                        lambda x: 'Blocked' if x['blocked'] else 'Active', axis=1
                     )
                     display_data = display_data.drop(['blocked', 'active'], axis=1)
                     display_data.columns = ['Timestamp', 'Attack Type', 'Description', 'Severity', 
                                            'Threat Actor', 'Target Sector', 'Confidence %', 'Status']
                     
-                    # Display the styled table
                     st.dataframe(
                         display_data.head(50),
                         use_container_width=True,
                         height=400
                     )
                     
-                    # Attack distribution charts
                     chart_col1, chart_col2 = st.columns(2)
                     
                     with chart_col1:
-                        # Attack types distribution
                         attack_dist = country_threats['technique_name'].value_counts()
                         fig_attacks = go.Figure(data=[go.Bar(
                             x=attack_dist.values[:10],
@@ -1419,7 +1514,6 @@ def main():
                         st.plotly_chart(fig_attacks, use_container_width=True)
                     
                     with chart_col2:
-                        # Sectors targeted
                         sector_dist = country_threats['target_sector'].value_counts()
                         fig_sectors = go.Figure(data=[go.Pie(
                             labels=sector_dist.index[:8],
@@ -1443,83 +1537,411 @@ def main():
         else:
             st.info("No threat data available with current filters")
 
-
-
-    # Tab 3: Intelligence Analysis
+    # Tab 3: ML Intelligence Analysis (merged with Security Recommendations)
     with main_tabs[3]:
-        st.markdown("### 🔬 THREAT INTELLIGENCE ANALYSIS")
+        st.markdown("### ML-POWERED THREAT INTELLIGENCE & SECURITY ANALYSIS")
         
         if not threat_df.empty:
-            anal_col1, anal_col2 = st.columns(2)
+            # Create sub-tabs for different ML analyses
+            ml_tabs = st.tabs([
+                "Threat Prediction",
+                "Anomaly Detection", 
+                "Threat Clustering",
+                "Security Recommendations"
+            ])
             
-            with anal_col1:
-                st.markdown("#### 🎯 ATTACK TECHNIQUES (Click for details)")
+            # Sub-tab 1: Threat Prediction
+            with ml_tabs[0]:
+                st.markdown("#### ML THREAT SEVERITY PREDICTOR")
+                st.markdown("*Machine learning model trained to predict threat severity based on attack patterns*")
                 
-                technique_stats = threat_df.groupby(['technique_id', 'technique_name', 'technique_description']).size().reset_index(name='count')
-                technique_stats = technique_stats.nlargest(5, 'count')
+                with st.spinner("Training ML model..."):
+                    model, metrics = ThreatMLModels.train_threat_predictor(threat_df)
                 
-                for idx, row in technique_stats.iterrows():
-                    with st.expander(f"{row['technique_id']}: {row['technique_name']} ({row['count']} attacks)"):
-                        st.markdown(f"**Description:** {row['technique_description']}")
-                        
-                        # Get threats for this technique
-                        technique_threats = threat_df[threat_df['technique_id'] == row['technique_id']]
-                        
-                        # Show affected countries and sectors
-                        affected_countries = technique_threats['target_country'].value_counts().head(5)
-                        affected_sectors = technique_threats['target_sector'].value_counts().head(5)
-                        
-                        col_a, col_b = st.columns(2)
-                        with col_a:
-                            st.markdown("**Top Affected Countries:**")
-                            for country, count in affected_countries.items():
-                                st.markdown(f"• {country}: {count} attacks")
-                        
-                        with col_b:
-                            st.markdown("**Top Affected Sectors:**")
-                            for sector, count in affected_sectors.items():
-                                st.markdown(f"• {sector}: {count} attacks")
-            
-            with anal_col2:
-                st.markdown("#### 🎭 THREAT ACTORS (Click for details)")
-                
-                actor_stats = threat_df['threat_actor'].value_counts().head(5)
-                
-                for actor, count in actor_stats.items():
-                    actor_info = ThreatIntelligence.THREAT_ACTORS.get(actor, {})
+                if model and metrics:
+                    # Display model performance
+                    perf_cols = st.columns(3)
+                    with perf_cols[0]:
+                        st.metric("Model Accuracy", f"{metrics['accuracy']*100:.1f}%")
+                    with perf_cols[1]:
+                        st.metric("Training Samples", len(threat_df))
+                    with perf_cols[2]:
+                        st.metric("Features Used", "7")
                     
-                    with st.expander(f"{actor} ({count} attacks) - {actor_info.get('origin', 'Unknown')}"):
-                        st.markdown(f"**Description:** {actor_info.get('description', 'No description available')}")
-                        st.markdown(f"**Sophistication:** {actor_info.get('sophistication', 'Unknown')}")
+                    # Feature importance chart
+                    st.markdown("##### FEATURE IMPORTANCE ANALYSIS")
+                    feature_imp = metrics['feature_importance']
+                    
+                    fig_importance = go.Figure(data=[go.Bar(
+                        x=feature_imp['importance'],
+                        y=feature_imp['feature'],
+                        orientation='h',
+                        marker=dict(
+                            color=feature_imp['importance'],
+                            colorscale=[[0, '#bf00ff'], [1, '#00ffff']],
+                            line=dict(color='#0a0e27', width=1)
+                        ),
+                        text=[f"{x:.3f}" for x in feature_imp['importance']],
+                        textposition='outside'
+                    )])
+                    
+                    fig_importance.update_layout(
+                        title='ML Model Feature Importance',
+                        xaxis_title='Importance Score',
+                        yaxis_title='Feature',
+                        plot_bgcolor='rgba(20, 25, 47, 0.1)',
+                        paper_bgcolor='rgba(20, 25, 47, 0.7)',
+                        font=dict(family="Orbitron, monospace", color='#b8bcc8'),
+                        height=400
+                    )
+                    st.plotly_chart(fig_importance, use_container_width=True)
+                    
+                    st.markdown("""
+                    **Model Insights:**
+                    - The Random Forest classifier analyzes attack patterns to predict threat severity
+                    - Features include attack technique, threat actor, target sector, country, confidence, and temporal patterns
+                    - Higher importance scores indicate features that are more influential in predicting threat severity
+                    """)
+            
+            # Sub-tab 2: Anomaly Detection
+            with ml_tabs[1]:
+                st.markdown("#### ML ANOMALY DETECTION")
+                st.markdown("*Isolation Forest algorithm identifies unusual threat patterns that deviate from normal behavior*")
+                
+                with st.spinner("Detecting anomalies..."):
+                    anomalies = ThreatMLModels.detect_anomalies(threat_df)
+                
+                if anomalies is not None and not anomalies.empty:
+                    anomaly_cols = st.columns(4)
+                    
+                    with anomaly_cols[0]:
+                        st.metric("Anomalies Detected", len(anomalies))
+                    with anomaly_cols[1]:
+                        anomaly_critical = len(anomalies[anomalies['severity'] == 'Critical'])
+                        st.metric("Critical Anomalies", anomaly_critical)
+                    with anomaly_cols[2]:
+                        anomaly_rate = (len(anomalies) / len(threat_df) * 100)
+                        st.metric("Anomaly Rate", f"{anomaly_rate:.1f}%")
+                    with anomaly_cols[3]:
+                        unique_actors = anomalies['threat_actor'].nunique()
+                        st.metric("Unique Actors", unique_actors)
+                    
+                    st.markdown("##### ANOMALOUS THREATS")
+                    
+                    anomaly_display = anomalies[['timestamp', 'technique_name', 'threat_actor', 
+                                                 'target_country', 'target_sector', 'severity', 
+                                                 'confidence']].head(20)
+                    anomaly_display.columns = ['Timestamp', 'Attack Type', 'Threat Actor', 
+                                              'Country', 'Sector', 'Severity', 'Confidence']
+                    
+                    st.dataframe(anomaly_display, use_container_width=True, height=400)
+                    
+                    st.markdown("""
+                    **Anomaly Detection Insights:**
+                    - These threats show unusual patterns compared to typical attack behavior
+                    - May indicate new attack techniques, sophisticated actors, or targeted campaigns
+                    - Recommend immediate investigation and enhanced monitoring for these patterns
+                    """)
+                else:
+                    st.info("No anomalies detected in current data")
+            
+            # Sub-tab 3: Threat Clustering
+            with ml_tabs[2]:
+                st.markdown("#### ML THREAT CLUSTERING")
+                st.markdown("*K-Means algorithm groups similar threats to identify attack patterns and campaigns*")
+                
+                with st.spinner("Clustering threats..."):
+                    cluster_analysis = ThreatMLModels.cluster_threats(threat_df, n_clusters=5)
+                
+                if cluster_analysis is not None:
+                    st.markdown("##### THREAT CLUSTER ANALYSIS")
+                    
+                    # Display cluster table
+                    cluster_display = cluster_analysis.copy()
+                    cluster_display['avg_confidence'] = cluster_display['avg_confidence'].round(1)
+                    cluster_display.columns = ['Cluster ID', 'Size', 'Top Technique', 'Top Actor', 
+                                              'Top Sector', 'Avg Confidence', 'Critical Count']
+                    
+                    st.dataframe(cluster_display, use_container_width=True)
+                    
+                    # Cluster visualization
+                    fig_clusters = go.Figure(data=[go.Bar(
+                        x=cluster_analysis['cluster_id'],
+                        y=cluster_analysis['size'],
+                        text=cluster_analysis['size'],
+                        textposition='outside',
+                        marker=dict(
+                            color=cluster_analysis['critical_count'],
+                            colorscale=[[0, '#00ffff'], [1, '#ff0000']],
+                            line=dict(color='#0a0e27', width=1),
+                            showscale=True,
+                            colorbar=dict(title="Critical<br>Threats")
+                        ),
+                        hovertext=[f"Top Technique: {row['top_technique']}<br>" +
+                                  f"Top Actor: {row['top_actor']}<br>" +
+                                  f"Top Sector: {row['top_sector']}<br>" +
+                                  f"Avg Confidence: {row['avg_confidence']:.1f}%"
+                                  for _, row in cluster_analysis.iterrows()],
+                        hoverinfo='text'
+                    )])
+                    
+                    fig_clusters.update_layout(
+                        title='Threat Cluster Distribution',
+                        xaxis_title='Cluster ID',
+                        yaxis_title='Number of Threats',
+                        plot_bgcolor='rgba(20, 25, 47, 0.1)',
+                        paper_bgcolor='rgba(20, 25, 47, 0.7)',
+                        font=dict(family="Orbitron, monospace", color='#b8bcc8'),
+                        height=400
+                    )
+                    st.plotly_chart(fig_clusters, use_container_width=True)
+                    
+                    st.markdown("""
+                    **Clustering Insights:**
+                    - Similar threats are grouped together to identify coordinated attack campaigns
+                    - Each cluster represents a distinct pattern of attack behavior
+                    - Analyze cluster characteristics to develop targeted defense strategies
+                    """)
+                else:
+                    st.info("Unable to perform clustering on current data")
+            
+            # Sub-tab 4: Security Recommendations (integrated from old tab)
+            with ml_tabs[3]:
+                st.markdown("#### SECURITY RECOMMENDATIONS (ISO 27001 & NIST)")
+                
+                recommendations = get_security_recommendations(threat_df)
+                
+                st.markdown("##### FRAMEWORK-BASED CONTROLS")
+                for rec in recommendations:
+                    priority_color = {
+                        'CRITICAL': '#ff0000',
+                        'HIGH': '#ff7f00',
+                        'MEDIUM': '#ffff00'
+                    }.get(rec['priority'], '#00ff00')
+                    
+                    with st.expander(f"[{rec['framework']}] {rec['title']} - {rec['priority']} PRIORITY", expanded=False):
+                        st.markdown(f"""
+                        <div style="padding: 15px; background: rgba(20, 25, 47, 0.7);
+                                    border: 2px solid {priority_color}; border-radius: 10px;">
+                            <div style="color: {priority_color}; font-weight: bold; margin-bottom: 10px;">
+                                Threat Context: {rec['threat']}
+                            </div>
+                            <div style="color: #00ffff; font-weight: bold; margin-bottom: 10px;">
+                                RECOMMENDED CONTROLS:
+                            </div>
+                            <div style="color: #b8bcc8;">
+                                {'<br>'.join(rec['controls'])}
+                            </div>
+                        </div>
+                        """, unsafe_allow_html=True)
+                
+                # Security Best Practice Flashcards
+                st.markdown("##### SECURITY BEST PRACTICES")
+                
+                top_threats = threat_df['technique_name'].value_counts().head(3)
+                critical_threats_count = len(threat_df[threat_df['severity'] == 'Critical'])
+                
+                flashcards = [
+                    {
+                        'title': 'Zero Trust Architecture',
+                        'content': 'Implement "never trust, always verify" principle. Require continuous verification for all users and devices.',
+                        'action': 'Deploy microsegmentation and identity-based access controls',
+                        'priority': 'CRITICAL' if 'Phishing' in top_threats.index else 'HIGH'
+                    },
+                    {
+                        'title': 'Threat Hunting Program',
+                        'content': 'Proactively search for cyber threats that evade existing security solutions.',
+                        'action': 'Use threat intelligence feeds to hunt for IOCs in your environment',
+                        'priority': 'HIGH'
+                    },
+                    {
+                        'title': 'Incident Response Plan',
+                        'content': 'Maintain an updated IR plan with clear roles and recovery procedures.',
+                        'action': 'Conduct tabletop exercises quarterly and update contact lists',
+                        'priority': 'CRITICAL' if critical_threats_count > 10 else 'HIGH'
+                    },
+                    {
+                        'title': 'Security Awareness Training',
+                        'content': 'Regular training on latest threats, especially phishing and social engineering.',
+                        'action': 'Implement monthly phishing simulations and track metrics',
+                        'priority': 'CRITICAL' if 'Phishing' in top_threats.index else 'MEDIUM'
+                    }
+                ]
+                
+                flashcard_cols = st.columns(4)
+                
+                for idx, card in enumerate(flashcards):
+                    with flashcard_cols[idx % 4]:
+                        priority_color = {
+                            'CRITICAL': 'linear-gradient(135deg, #ff0000, #ff4444)',
+                            'HIGH': 'linear-gradient(135deg, #ff7f00, #ffaa00)',
+                            'MEDIUM': 'linear-gradient(135deg, #ffff00, #ffff66)'
+                        }.get(card['priority'], 'linear-gradient(135deg, #00ff00, #44ff44)')
                         
-                        # Get threats for this actor
-                        actor_threats = threat_df[threat_df['threat_actor'] == actor]
-                        
-                        # Show attack types and targets
-                        attack_types = actor_threats['technique_name'].value_counts().head(3)
-                        target_countries = actor_threats['target_country'].value_counts().head(3)
-                        target_sectors = actor_threats['target_sector'].value_counts().head(3)
-                        
-                        st.markdown("**Primary Attack Types:**")
-                        for attack, count in attack_types.items():
-                            st.markdown(f"• {attack}: {count} instances")
-                        
-                        col_a, col_b = st.columns(2)
-                        with col_a:
-                            st.markdown("**Target Countries:**")
-                            for country, count in target_countries.items():
-                                st.markdown(f"• {country}: {count}")
-                        
-                        with col_b:
-                            st.markdown("**Target Sectors:**")
-                            for sector, count in target_sectors.items():
-                                st.markdown(f"• {sector}: {count}")
+                        st.markdown(f"""
+                        <div style="padding: 20px; margin: 10px 0; 
+                                    background: linear-gradient(135deg, rgba(20, 25, 47, 0.9), rgba(40, 45, 67, 0.7));
+                                    border: 2px solid rgba(0, 255, 255, 0.3); 
+                                    border-radius: 15px;
+                                    min-height: 220px;">
+                            
+                            <div style="position: absolute; top: -10px; right: -10px; 
+                                        padding: 5px 10px; border-radius: 20px;
+                                        background: {priority_color};
+                                        color: white; font-size: 0.8em; font-weight: bold;">
+                                {card['priority']}
+                            </div>
+                            
+                            <div style="color: #00ffff; font-weight: bold; text-align: center; 
+                                        margin-bottom: 10px; font-family: 'Orbitron', monospace;
+                                        font-size: 1.1em;">
+                                {card['title']}
+                            </div>
+                            
+                            <div style="color: #b8bcc8; font-size: 0.9em; text-align: center; 
+                                        margin-bottom: 15px; min-height: 60px;">
+                                {card['content']}
+                            </div>
+                        </div>
+                        """, unsafe_allow_html=True)
         else:
-            st.info("No threat data available with current filters")
-
-    # Tab 3: Human-Targeted Attacks
+            st.info("No threat data available for ML analysis")
+    
+    # Tab 4: ML Trend Analysis
+    with main_tabs[4]:
+        st.markdown("### ML-POWERED TREND ANALYSIS & FORECASTING")
+        
+        if not threat_df.empty:
+            # Filtering controls
+            trend_col1, trend_col2, trend_col3, trend_col4 = st.columns(4)
+            
+            with trend_col1:
+                trend_attack = st.selectbox(
+                    "Attack Type",
+                    options=['All'] + list(threat_df['technique_name'].unique()),
+                    key="trend_attack"
+                )
+            
+            with trend_col2:
+                trend_country = st.selectbox(
+                    "Country",
+                    options=['All'] + list(threat_df['target_country'].unique()),
+                    key="trend_country"
+                )
+            
+            with trend_col3:
+                trend_sector = st.selectbox(
+                    "Sector",
+                    options=['All'] + list(threat_df['target_sector'].unique()),
+                    key="trend_sector"
+                )
+            
+            with trend_col4:
+                trend_time = st.selectbox(
+                    "Time Range",
+                    options=['24h', '7d', '30d'],
+                    index=1,
+                    key="trend_time"
+                )
+            
+            # Historical trend analysis
+            st.markdown("#### HISTORICAL TREND ANALYSIS")
+            trend_chart = create_trend_analysis_charts(
+                threat_df,
+                attack_type=None if trend_attack == 'All' else trend_attack,
+                country=None if trend_country == 'All' else trend_country,
+                sector=None if trend_sector == 'All' else trend_sector,
+                time_range=trend_time
+            )
+            st.plotly_chart(trend_chart, use_container_width=True)
+            
+            # ML-based forecast
+            st.markdown("#### ML THREAT FORECAST (7 DAYS)")
+            st.markdown("*Simple moving average model predicts future threat activity*")
+            
+            with st.spinner("Generating ML forecast..."):
+                forecast_df = ThreatMLModels.forecast_threats(threat_df, days_ahead=7)
+            
+            if forecast_df is not None:
+                # Create combined historical + forecast chart
+                historical_df = threat_df.copy()
+                historical_df['date'] = pd.to_datetime(historical_df['timestamp']).dt.date
+                daily_counts = historical_df.groupby('date').size().reset_index(name='count')
+                daily_counts['date'] = pd.to_datetime(daily_counts['date'])
+                
+                fig_forecast = go.Figure()
+                
+                # Historical data
+                fig_forecast.add_trace(go.Scatter(
+                    x=daily_counts['date'],
+                    y=daily_counts['count'],
+                    mode='lines+markers',
+                    name='Historical',
+                    line=dict(color='#00ffff', width=3),
+                    marker=dict(size=6, color='#00ffff')
+                ))
+                
+                # Forecast data
+                fig_forecast.add_trace(go.Scatter(
+                    x=forecast_df['date'],
+                    y=forecast_df['forecast_count'],
+                    mode='lines+markers',
+                    name='Forecast',
+                    line=dict(color='#bf00ff', width=3, dash='dash'),
+                    marker=dict(size=8, color='#bf00ff', symbol='diamond')
+                ))
+                
+                fig_forecast.update_layout(
+                    title='Threat Count: Historical + 7-Day ML Forecast',
+                    xaxis_title='Date',
+                    yaxis_title='Threat Count',
+                    plot_bgcolor='rgba(20, 25, 47, 0.1)',
+                    paper_bgcolor='rgba(20, 25, 47, 0.7)',
+                    font=dict(family="Orbitron, monospace", color='#b8bcc8'),
+                    height=450,
+                    hovermode='x unified',
+                    legend=dict(
+                        orientation="h",
+                        yanchor="bottom",
+                        y=1.02,
+                        xanchor="right",
+                        x=1
+                    )
+                )
+                
+                st.plotly_chart(fig_forecast, use_container_width=True)
+                
+                # Forecast summary
+                st.markdown("##### FORECAST INSIGHTS")
+                
+                avg_forecast = forecast_df['forecast_count'].mean()
+                avg_historical = daily_counts['count'].tail(7).mean()
+                change_pct = ((avg_forecast - avg_historical) / avg_historical * 100) if avg_historical > 0 else 0
+                
+                forecast_cols = st.columns(3)
+                with forecast_cols[0]:
+                    st.metric("Avg Historical (Last 7d)", f"{avg_historical:.0f}")
+                with forecast_cols[1]:
+                    st.metric("Avg Forecast (Next 7d)", f"{avg_forecast:.0f}", delta=f"{change_pct:+.1f}%")
+                with forecast_cols[2]:
+                    trend_direction = "INCREASING" if change_pct > 5 else "STABLE" if change_pct > -5 else "DECREASING"
+                    st.metric("Trend Direction", trend_direction)
+                
+                st.markdown("""
+                **Forecast Model:**
+                - Uses 7-day moving average to predict future threat activity
+                - Incorporates random variation to simulate real-world uncertainty
+                - Best used for short-term tactical planning (3-7 days)
+                - Recommend combining with threat intelligence feeds for strategic decisions
+                """)
+            else:
+                st.info("Insufficient data for forecasting")
+        else:
+            st.info("No data available for trend analysis")
+    
+    # Tab 5: Human-Targeted Attacks
     with main_tabs[1]:
-        st.markdown("### 👤 HUMAN-TARGETED ATTACK ANALYSIS")
+        st.markdown("### HUMAN-TARGETED ATTACK ANALYSIS")
         st.markdown("*Focus on attacks that exploit human psychology and behavior*")
         
         # Define human-targeted attack types
@@ -1619,7 +2041,7 @@ def main():
         
         # Metrics for human-targeted attacks
         if not human_targeted_threats.empty:
-            st.markdown("#### 📊 HUMAN-TARGETED ATTACK METRICS")
+            st.markdown("#### HUMAN-TARGETED ATTACK METRICS")
             
             metric_cols = st.columns(5)
             with metric_cols[0]:
@@ -1641,17 +2063,14 @@ def main():
             with metric_cols[4]:
                 success_rate = (blocked_human / total_human * 100) if total_human > 0 else 0
                 st.metric("Block Rate", f"{success_rate:.1f}%")
-        
-        
-        
-        # Recent Human-Targeted Attacks
-        if not human_targeted_threats.empty:
-            st.markdown("#### 🔴 RECENT HUMAN-TARGETED ATTACKS")
+            
+            # Recent Human-Targeted Attacks
+            st.markdown("#### RECENT HUMAN-TARGETED ATTACKS")
             
             recent_human = human_targeted_threats.nlargest(10, 'timestamp')
             for _, attack in recent_human.iterrows():
                 status_color = '#00ff00' if attack['blocked'] else '#ff0000'
-                status_text = '🛡️ Blocked' if attack['blocked'] else '⚠️ Active'
+                status_text = 'BLOCKED' if attack['blocked'] else 'ACTIVE'
                 
                 st.markdown(f"""
                 <div style="padding: 12px; margin: 8px 0;
@@ -1678,181 +2097,19 @@ def main():
                     </div>
                 </div>
                 """, unsafe_allow_html=True)
-            
         else:
-            st.info("No threat data available with current filters")
-
-
-    # Tab 4: Security Recommendations
-    with main_tabs[4]:
-        st.markdown("### 💡 SECURITY RECOMMENDATIONS (ISO 27001 & NIST)")
-        
-        recommendations = get_security_recommendations(threat_df)
-        
-        # Framework-based recommendations
-        st.markdown("#### 📋 FRAMEWORK-BASED CONTROLS")
-        for rec in recommendations:
-            priority_color = {
-                'CRITICAL': '#ff0000',
-                'HIGH': '#ff7f00',
-                'MEDIUM': '#ffff00'
-            }.get(rec['priority'], '#00ff00')
-            
-            with st.expander(f"⚠️ [{rec['framework']}] {rec['title']} - {rec['priority']} PRIORITY", expanded=False):
-                st.markdown(f"""
-                <div style="padding: 15px; background: rgba(20, 25, 47, 0.7);
-                            border: 2px solid {priority_color}; border-radius: 10px;">
-                    <div style="color: {priority_color}; font-weight: bold; margin-bottom: 10px;">
-                        Threat Context: {rec['threat']}
-                    </div>
-                    <div style="color: #00ffff; font-weight: bold; margin-bottom: 10px;">
-                        RECOMMENDED CONTROLS:
-                    </div>
-                    <div style="color: #b8bcc8;">
-                        {'<br>'.join(rec['controls'])}
-                    </div>
-                </div>
-                """, unsafe_allow_html=True)
-        
-        # Security Best Practice Flashcards
-        st.markdown("#### 📚 SECURITY BEST PRACTICES FLASHCARDS")
-        
-        # Define flashcards based on current threats
-        top_threats = threat_df['technique_name'].value_counts().head(3) if not threat_df.empty else pd.Series()
-        
-        flashcards = [
-            {
-                'title': 'Zero Trust Architecture',
-                'icon': '🔐',
-                'content': 'Implement "never trust, always verify" principle. Require continuous verification for all users and devices.',
-                'action': 'Deploy microsegmentation and identity-based access controls',
-                'priority': 'CRITICAL' if 'Phishing' in top_threats.index else 'HIGH'
-            },
-            {
-                'title': 'Threat Hunting Program',
-                'icon': '🎯',
-                'content': 'Proactively search for cyber threats that evade existing security solutions.',
-                'action': 'Use threat intelligence feeds to hunt for IOCs in your environment',
-                'priority': 'HIGH'
-            },
-            {
-                'title': 'Incident Response Plan',
-                'icon': '📋',
-                'content': 'Maintain an updated IR plan with clear roles and recovery procedures.',
-                'action': 'Conduct tabletop exercises quarterly and update contact lists',
-                'priority': 'CRITICAL' if critical_threats > 10 else 'HIGH'
-            },
-            {
-                'title': 'Security Awareness Training',
-                'icon': '🎓',
-                'content': 'Regular training on latest threats, especially phishing and social engineering.',
-                'action': 'Implement monthly phishing simulations and track metrics',
-                'priority': 'CRITICAL' if 'Phishing' in top_threats.index else 'MEDIUM'
-            }
-        ]
-        
-        # Display flashcards in a grid
-        flashcard_cols = st.columns(4)
-        
-        for idx, card in enumerate(flashcards):
-            with flashcard_cols[idx % 4]:
-                priority_color = {
-                    'CRITICAL': 'linear-gradient(135deg, #ff0000, #ff4444)',
-                    'HIGH': 'linear-gradient(135deg, #ff7f00, #ffaa00)',
-                    'MEDIUM': 'linear-gradient(135deg, #ffff00, #ffff66)'
-                }.get(card['priority'], 'linear-gradient(135deg, #00ff00, #44ff44)')
-                
-                st.markdown(f"""
-                <div style="padding: 20px; margin: 10px 0; 
-                            background: linear-gradient(135deg, rgba(20, 25, 47, 0.9), rgba(40, 45, 67, 0.7));
-                            border: 2px solid rgba(0, 255, 255, 0.3); 
-                            border-radius: 15px;
-                            min-height: 250px; 
-                            position: relative;">
-                    
-                    <div style="position: absolute; top: -10px; right: -10px; 
-                                padding: 5px 10px; border-radius: 20px;
-                                background: {priority_color};
-                                color: white; font-size: 0.8em; font-weight: bold;">
-                        {card['priority']}
-                    </div>
-                    
-                    <div style="font-size: 3em; text-align: center; margin-bottom: 15px;">
-                        {card['icon']}
-                    </div>
-                    
-                    <div style="color: #00ffff; font-weight: bold; text-align: center; 
-                                margin-bottom: 10px; font-family: 'Orbitron', monospace;
-                                font-size: 1.1em;">
-                        {card['title']}
-                    </div>
-                    
-                    <div style="color: #b8bcc8; font-size: 0.9em; text-align: center; 
-                                margin-bottom: 15px; min-height: 60px;">
-                        {card['content']}
-                    </div>
-                </div>
-                """, unsafe_allow_html=True)
-    
-    # Tab 5: Trend Analysis
-    with main_tabs[5]:
-        st.markdown("### 📈 CUSTOMIZABLE TREND ANALYSIS")
-        
-        if not threat_df.empty:
-            trend_col1, trend_col2, trend_col3, trend_col4 = st.columns(4)
-            
-            with trend_col1:
-                trend_attack = st.selectbox(
-                    "Attack Type",
-                    options=['All'] + list(threat_df['technique_name'].unique()),
-                    key="trend_attack"
-                )
-            
-            with trend_col2:
-                trend_country = st.selectbox(
-                    "Country",
-                    options=['All'] + list(threat_df['target_country'].unique()),
-                    key="trend_country"
-                )
-            
-            with trend_col3:
-                trend_sector = st.selectbox(
-                    "Sector",
-                    options=['All'] + list(threat_df['target_sector'].unique()),
-                    key="trend_sector"
-                )
-            
-            with trend_col4:
-                trend_time = st.selectbox(
-                    "Time Range",
-                    options=['24h', '7d', '30d'],
-                    index=1,
-                    key="trend_time"
-                )
-            
-            # Create trend chart
-            trend_chart = create_trend_analysis_charts(
-                threat_df,
-                attack_type=None if trend_attack == 'All' else trend_attack,
-                country=None if trend_country == 'All' else trend_country,
-                sector=None if trend_sector == 'All' else trend_sector,
-                time_range=trend_time
-            )
-            
-            st.plotly_chart(trend_chart, use_container_width=True)
-        else:
-            st.info("No data available for trend analysis")
+            st.info("No human-targeted threats detected with current filters")
     
     # Tab 6: IOC Scanner
-    with main_tabs[6]:
-        st.markdown("### 🔍 IOC SCANNER & THREAT DETECTION")
+    with main_tabs[5]:
+        st.markdown("### IOC SCANNER & THREAT DETECTION")
         
         ioc_input = st.text_input(
             "Enter IOC (Hash, IP, Domain, or URL)",
             placeholder="e.g., 192.168.1.1, malicious.com, d41d8cd98f00b204e9800998ecf8427e"
         )
         
-        if st.button("🔍 SCAN IOC"):
+        if st.button("SCAN IOC"):
             if ioc_input:
                 with st.spinner("Scanning..."):
                     time.sleep(2)
@@ -1872,7 +2129,11 @@ def main():
                         st.metric("Reputation", f"{random.randint(10, 100)}/100")
                     with col4:
                         st.metric("Last Seen", f"{random.randint(1, 24)}h ago")
+                    
+                    if is_malicious:
+                        st.error("WARNING: This IOC has been flagged as malicious by multiple security vendors!")
+                    else:
+                        st.success("This IOC appears to be clean based on current threat intelligence.")
 
 if __name__ == "__main__":
-    # Run the main function
     main()
