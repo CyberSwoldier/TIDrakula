@@ -241,7 +241,7 @@ class ThreatIntelligence:
     }
     
     @staticmethod
-    def generate_threat_feed(num_events=1000):
+    def generate_threat_feed(num_events=50000):
         threat_events = []
         for _ in range(num_events):
             technique_id = random.choice(list(ThreatIntelligence.ATTACK_TECHNIQUES.keys()))
@@ -563,7 +563,7 @@ def generate_data():
         st.session_state.feed_status = feeds_status
         return combined
     else:
-        return ThreatIntelligence.generate_threat_feed(1000)
+        return ThreatIntelligence.generate_threat_feed(50000)
 
 # ============================================================================
 # VISUALIZATIONS
