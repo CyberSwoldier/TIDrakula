@@ -50,19 +50,32 @@ class OTXConnector:
         }
     
     def get_pulses_subscribed(self, limit=50, modified_since=None):
-        """Get pulses from subscribed users"""
+        """Get pulses from subscribed users with retry logic"""
         url = f"{OTX_BASE_URL}/pulses/subscribed"
         params = {'limit': limit}
         if modified_since:
             params['modified_since'] = modified_since
         
-        try:
-            response = requests.get(url, headers=self.headers, params=params, timeout=10)
-            response.raise_for_status()
-            return response.json()
-        except Exception as e:
-            st.error(f"Error fetching OTX pulses: {e}")
-            return None
+        # Retry up to 3 times with increasing timeout
+        for attempt in range(3):
+            try:
+                timeout = 20 + (attempt * 10)  # 20s, 30s, 40s
+                response = requests.get(url, headers=self.headers, params=params, timeout=timeout)
+                response.raise_for_status()
+                return response.json()
+            except requests.exceptions.Timeout:
+                if attempt < 2:  # Don't show error on last attempt yet
+                    continue
+                st.warning(f"OTX API timeout after {attempt + 1} attempts. Using cached/alternative data.")
+                return None
+            except requests.exceptions.RequestException as e:
+                st.error(f"OTX API error: {str(e)[:100]}")
+                return None
+            except Exception as e:
+                st.error(f"Unexpected error: {str(e)[:100]}")
+                return None
+        
+        return None
 
 # ============================================================================
 # FUTURISTIC THEME
@@ -230,13 +243,22 @@ class ThreatIntelligence:
 
 @st.cache_data(ttl=300)
 def fetch_otx_data():
-    """Fetch real threat data from OTX"""
+    """Fetch real threat data from OTX with better error handling"""
+    
+    # Show loading indicator
+    progress_text = st.empty()
+    progress_text.info("🔄 Connecting to OTX API...")
+    
     otx = OTXConnector(OTX_API_KEY)
-    pulses_data = otx.get_pulses_subscribed(limit=100)
+    
+    # Try to fetch pulses
+    pulses_data = otx.get_pulses_subscribed(limit=50)  # Reduced from 100 for faster response
     
     threat_events = []
     
     if pulses_data and 'results' in pulses_data:
+        progress_text.success(f"✅ Retrieved {len(pulses_data['results'])} pulses from OTX")
+        
         for pulse in pulses_data['results']:
             try:
                 pulse_id = pulse.get('id', '')
@@ -310,8 +332,14 @@ def fetch_otx_data():
                     'ioc_domain': ioc_domain,
                     'mitigation': 'Blocked' if is_blocked else 'ACTION REQUIRED'
                 })
-            except:
+            except Exception as e:
                 continue
+        
+        progress_text.empty()
+    else:
+        progress_text.warning("⚠️ OTX API unavailable - using alternative feeds")
+        time.sleep(2)
+        progress_text.empty()
     
     return pd.DataFrame(threat_events) if threat_events else pd.DataFrame()
 
@@ -360,18 +388,20 @@ def fetch_rss_feeds():
     return pd.DataFrame(all_articles)
 
 def generate_data():
-    """Fetch threat intelligence"""
+    """Fetch threat intelligence with fallback options"""
     df_otx = fetch_otx_data()
     df_rss = fetch_rss_feeds()
     
     if not df_otx.empty:
         df_combined = pd.concat([df_otx, df_rss], ignore_index=True)
-        st.success(f"✅ Loaded {len(df_otx)} threats from OTX API")
+        return df_combined
+    elif not df_rss.empty:
+        # OTX failed but RSS succeeded
+        return df_rss
     else:
-        df_combined = df_rss
-        st.warning("⚠️ OTX API unavailable, using RSS feeds")
-    
-    return df_combined
+        # Both external sources failed, generate sample data
+        st.info("📊 Generating sample threat data for demonstration")
+        return ThreatIntelligence.generate_threat_feed(100)
 
 # ============================================================================
 # VISUALIZATIONS
@@ -447,18 +477,15 @@ def main():
     
     # Initialize data
     if 'threat_data' not in st.session_state:
-        with st.spinner("Loading OTX threat intelligence..."):
+        with st.spinner("Connecting to threat intelligence sources..."):
             st.session_state.threat_data = generate_data()
-            if st.session_state.threat_data.empty:
-                st.session_state.threat_data = ThreatIntelligence.generate_threat_feed(1000)
     
     # Auto-update check
     if check_auto_update():
-        with st.spinner("Refreshing OTX data..."):
-            new_data = generate_data()
-            if not new_data.empty:
-                st.session_state.threat_data = pd.concat([new_data, st.session_state.threat_data]).reset_index(drop=True)
-                st.session_state.threat_data = st.session_state.threat_data.head(1000)
+        new_data = generate_data()
+        if not new_data.empty:
+            st.session_state.threat_data = pd.concat([new_data, st.session_state.threat_data]).reset_index(drop=True)
+            st.session_state.threat_data = st.session_state.threat_data.head(1000)
     
     # Calculate time until next update
     seconds_since = (datetime.now() - st.session_state.last_update).total_seconds()
