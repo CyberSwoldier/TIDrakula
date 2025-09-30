@@ -210,7 +210,7 @@ class ThreatIntelligence:
     }
     
     @staticmethod
-    def generate_threat_feed(num_events=1000):
+    def generate_threat_feed(num_events=50000):
         threat_events = []
         for _ in range(num_events):
             technique_id = random.choice(list(ThreatIntelligence.ATTACK_TECHNIQUES.keys()))
@@ -445,7 +445,7 @@ def generate_data():
     if dfs_to_combine:
         return pd.concat(dfs_to_combine, ignore_index=True)
     else:
-        return ThreatIntelligence.generate_threat_feed(1000)
+        return ThreatIntelligence.generate_threat_feed(50000)
 
 # ============================================================================
 # VISUALIZATIONS
@@ -604,7 +604,7 @@ def main():
         new_data = generate_data()
         if not new_data.empty:
             st.session_state.threat_data = pd.concat([new_data, st.session_state.threat_data]).reset_index(drop=True)
-            st.session_state.threat_data = st.session_state.threat_data.head(1000)
+            st.session_state.threat_data = st.session_state.threat_data.head(50000)
     
     seconds_since = (datetime.now() - st.session_state.last_update).total_seconds()
     seconds_until = 300 - seconds_since
