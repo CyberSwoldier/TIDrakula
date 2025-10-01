@@ -140,7 +140,6 @@ class OTXDataFetcher:
     
     BASE_URL = "https://otx.alienvault.com/api/v1"
     
-@staticmethod
 def fetch_pulses(api_key, limit=100):
     """Fetch threat pulses from OTX with retries"""
     if not api_key:
