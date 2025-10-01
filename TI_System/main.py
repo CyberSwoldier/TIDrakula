@@ -142,7 +142,7 @@ class OTXDataFetcher:
     
 @staticmethod
 @st.cache_data(ttl=300)
-def fetch_pulses(api_key, limit=100):
+def fetch_pulses(api_key, limit=500):
     """Fetch threat pulses from OTX with retries"""
     if not api_key:
         return []
@@ -156,7 +156,7 @@ def fetch_pulses(api_key, limit=100):
                 f"{OTXDataFetcher.BASE_URL}/pulses/subscribed",
                 headers=headers,
                 params={'limit': limit},
-                timeout=30
+                timeout=50
             )
             
             if response.status_code == 200:
