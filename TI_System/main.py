@@ -834,7 +834,7 @@ class ThreatIntelligence:
         }
     
     @staticmethod
-    def generate_threat_feed(num_events=1000):
+    def generate_threat_feed(num_events=1):
         """Generate threat intelligence feed data"""
         return pd.DataFrame([ThreatIntelligence.generate_threat_event() for _ in range(num_events)])
 
