@@ -164,7 +164,7 @@ class OTXDataFetcher:
     
     @staticmethod
     @st.cache_data(ttl=600)  # Cache for 10 minutes
-    def fetch_pulses(api_key, limit=50):
+    def fetch_pulses(api_key, limit=500):
         """Fetch threat pulses from OTX"""
         if not api_key:
             return []
@@ -281,7 +281,7 @@ class AbuseIPDBDataFetcher:
     
     @staticmethod
     @st.cache_data(ttl=600)
-    def fetch_blacklist(api_key, confidence_minimum=90, limit=10000):
+    def fetch_blacklist(api_key, confidence_minimum=80, limit=10000):
         """Fetch blacklisted IPs from AbuseIPDB"""
         if not api_key:
             return []
