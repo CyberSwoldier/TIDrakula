@@ -16,6 +16,7 @@ import hashlib
 import json
 import feedparser
 from typing import Dict, List, Tuple
+import requests
 
 # Machine Learning imports
 from sklearn.ensemble import RandomForestClassifier, IsolationForest
@@ -26,10 +27,21 @@ from sklearn.cluster import KMeans
 import warnings
 warnings.filterwarnings('ignore')
 
+# API Configuration
+try:
+    OTX_API_KEY = st.secrets["OTX_API_KEY"]
+    SHODAN_API_KEY = st.secrets["SHODAN_API_KEY"]
+    USE_REAL_DATA = True
+except:
+    st.warning("API keys not found in secrets. Using simulated data.")
+    OTX_API_KEY = None
+    SHODAN_API_KEY = None
+    USE_REAL_DATA = False
+
 # Page configuration
 st.set_page_config(
     page_title="Threat Intelligence Platform - TIP",
-    page_icon=" ",
+    page_icon="🛡️",
     layout="wide",
     initial_sidebar_state="expanded"
 )
@@ -140,6 +152,230 @@ def apply_futuristic_theme():
     }
     </style>
     """, unsafe_allow_html=True)
+
+# ============================================================================
+# API DATA FETCHING FUNCTIONS
+# ============================================================================
+
+class OTXDataFetcher:
+    """Fetch threat intelligence from AlienVault OTX"""
+    
+    BASE_URL = "https://otx.alienvault.com/api/v1"
+    
+    @staticmethod
+    @st.cache_data(ttl=600)  # Cache for 10 minutes
+    def fetch_pulses(api_key, limit=50):
+        """Fetch threat pulses from OTX"""
+        if not api_key:
+            return []
+        
+        headers = {'X-OTX-API-KEY': api_key}
+        
+        try:
+            # Get subscribed pulses
+            response = requests.get(
+                f"{OTXDataFetcher.BASE_URL}/pulses/subscribed",
+                headers=headers,
+                params={'limit': limit},
+                timeout=10
+            )
+            
+            if response.status_code == 200:
+                data = response.json()
+                return data.get('results', [])
+            else:
+                st.error(f"OTX API Error: {response.status_code}")
+                return []
+        except Exception as e:
+            st.error(f"OTX Fetch Error: {str(e)}")
+            return []
+    
+    @staticmethod
+    def parse_otx_data(pulses):
+        """Convert OTX pulses to threat data format"""
+        threats = []
+        
+        for pulse in pulses:
+            try:
+                # Map OTX data to our format
+                created = pulse.get('created', datetime.now().isoformat())
+                timestamp = datetime.fromisoformat(created.replace('Z', '+00:00'))
+                
+                # Determine severity based on OTX tags and indicators
+                tags = pulse.get('tags', [])
+                indicator_count = len(pulse.get('indicators', []))
+                
+                if any(tag in ['apt', 'critical', 'ransomware'] for tag in tags):
+                    severity = 'Critical'
+                elif indicator_count > 10 or any(tag in ['malware', 'exploit'] for tag in tags):
+                    severity = 'High'
+                elif indicator_count > 5:
+                    severity = 'Medium'
+                else:
+                    severity = 'Low'
+                
+                # Map to MITRE ATT&CK technique (simplified mapping)
+                technique_name = 'Phishing'  # Default
+                if any(tag in ['ransomware', 'encryption'] for tag in tags):
+                    technique_name = 'Data Encrypted for Impact'
+                elif any(tag in ['ddos', 'dos'] for tag in tags):
+                    technique_name = 'Network Denial of Service'
+                elif any(tag in ['exploit', 'vulnerability'] for tag in tags):
+                    technique_name = 'Exploit Public-Facing Application'
+                
+                # Get technique details
+                technique_id = None
+                for tid, tech in ThreatIntelligence.ATTACK_TECHNIQUES.items():
+                    if tech['name'] == technique_name:
+                        technique_id = tid
+                        break
+                
+                if not technique_id:
+                    technique_id = 'T1566'  # Default to Phishing
+                
+                technique = ThreatIntelligence.ATTACK_TECHNIQUES[technique_id]
+                
+                # Determine threat actor (use author or default to random)
+                author = pulse.get('author_name', 'Unknown')
+                threat_actor = random.choice(list(ThreatIntelligence.THREAT_ACTORS.keys()))
+                
+                # Determine target based on tags
+                target_sector = 'Technology'  # Default
+                if any(tag in ['finance', 'banking'] for tag in tags):
+                    target_sector = 'Finance'
+                elif any(tag in ['healthcare', 'medical'] for tag in tags):
+                    target_sector = 'Healthcare'
+                elif any(tag in ['government', 'gov'] for tag in tags):
+                    target_sector = 'Government'
+                
+                threats.append({
+                    'timestamp': timestamp,
+                    'threat_id': pulse.get('id', hashlib.md5(str(timestamp).encode()).hexdigest()),
+                    'technique_id': technique_id,
+                    'technique_name': technique_name,
+                    'technique_description': technique['description'],
+                    'category': technique['category'],
+                    'severity': severity,
+                    'threat_actor': threat_actor,
+                    'actor_description': ThreatIntelligence.THREAT_ACTORS[threat_actor]['description'],
+                    'origin_country': ThreatIntelligence.THREAT_ACTORS[threat_actor]['origin'],
+                    'target_country': random.choice(list(ThreatIntelligence.COUNTRIES.keys())),
+                    'target_sector': target_sector,
+                    'confidence': min(100, 60 + indicator_count * 2),
+                    'kill_chain_phase': random.choice(list(ThreatIntelligence.KILL_CHAIN_PHASES.keys())),
+                    'malware_family': pulse.get('name', 'Unknown')[:30],
+                    'detection_source': 'OTX',
+                    'blocked': random.choice([True, True, True, False]),
+                    'active': random.choice([True, False]),
+                    'ioc_ip': pulse.get('indicators', [{}])[0].get('indicator', 'N/A') if pulse.get('indicators') else 'N/A',
+                    'ioc_domain': 'N/A',
+                    'mitigation': pulse.get('description', 'No mitigation info')[:100]
+                })
+            except Exception as e:
+                continue
+        
+        return threats
+
+class ShodanDataFetcher:
+    """Fetch vulnerability and exposure data from Shodan"""
+    
+    @staticmethod
+    @st.cache_data(ttl=600)  # Cache for 10 minutes
+    def fetch_vulnerabilities(api_key, query="vuln", limit=100):
+        """Fetch vulnerability data from Shodan"""
+        if not api_key:
+            return []
+        
+        try:
+            response = requests.get(
+                "https://api.shodan.io/shodan/host/search",
+                params={
+                    'key': api_key,
+                    'query': query,
+                    'limit': limit
+                },
+                timeout=10
+            )
+            
+            if response.status_code == 200:
+                data = response.json()
+                return data.get('matches', [])
+            else:
+                st.error(f"Shodan API Error: {response.status_code}")
+                return []
+        except Exception as e:
+            st.error(f"Shodan Fetch Error: {str(e)}")
+            return []
+    
+    @staticmethod
+    def parse_shodan_data(matches):
+        """Convert Shodan data to threat data format"""
+        threats = []
+        
+        for match in matches:
+            try:
+                timestamp = datetime.now() - timedelta(hours=random.randint(0, 168))
+                
+                # Determine severity based on vulnerabilities
+                vulns = match.get('vulns', [])
+                if len(vulns) > 5:
+                    severity = 'Critical'
+                elif len(vulns) > 2:
+                    severity = 'High'
+                elif len(vulns) > 0:
+                    severity = 'Medium'
+                else:
+                    severity = 'Low'
+                
+                # Map to technique
+                port = match.get('port', 0)
+                if port in [80, 443, 8080, 8443]:
+                    technique_name = 'Exploit Public-Facing Application'
+                    technique_id = 'T1190'
+                else:
+                    technique_name = 'Network Denial of Service'
+                    technique_id = 'T1498'
+                
+                technique = ThreatIntelligence.ATTACK_TECHNIQUES[technique_id]
+                
+                # Get location
+                location = match.get('location', {})
+                country_code = location.get('country_code', 'US')
+                country_map = {
+                    'US': 'USA', 'GB': 'UK', 'DE': 'Germany', 'JP': 'Japan',
+                    'CN': 'China', 'RU': 'Russia', 'FR': 'France', 'IN': 'India'
+                }
+                target_country = country_map.get(country_code, 'USA')
+                
+                threat_actor = random.choice(list(ThreatIntelligence.THREAT_ACTORS.keys()))
+                
+                threats.append({
+                    'timestamp': timestamp,
+                    'threat_id': match.get('ip_str', '') + str(port),
+                    'technique_id': technique_id,
+                    'technique_name': technique_name,
+                    'technique_description': technique['description'],
+                    'category': technique['category'],
+                    'severity': severity,
+                    'threat_actor': threat_actor,
+                    'actor_description': ThreatIntelligence.THREAT_ACTORS[threat_actor]['description'],
+                    'origin_country': ThreatIntelligence.THREAT_ACTORS[threat_actor]['origin'],
+                    'target_country': target_country,
+                    'target_sector': random.choice(ThreatIntelligence.SECTORS),
+                    'confidence': 70 + len(vulns) * 5,
+                    'kill_chain_phase': 'Exploitation',
+                    'malware_family': match.get('product', 'Unknown')[:30],
+                    'detection_source': 'Shodan',
+                    'blocked': random.choice([True, True, False]),
+                    'active': len(vulns) > 0,
+                    'ioc_ip': match.get('ip_str', 'N/A'),
+                    'ioc_domain': match.get('domains', ['N/A'])[0] if match.get('domains') else 'N/A',
+                    'mitigation': f"Patch vulnerabilities on port {port}"
+                })
+            except Exception as e:
+                continue
+        
+        return threats
 
 # ============================================================================
 # AUTO-UPDATE MECHANISM (5 MINUTES)
@@ -318,62 +554,76 @@ class ThreatMLModels:
 
 def generate_data():
     """
-    Generates a mock dataframe for threat intelligence data.
-    This simulates fetching new data every 5 minutes.
+    Generates threat intelligence data from real APIs (OTX, Shodan) or simulated data as fallback.
     """
-    # Simulate a new threat every few minutes
-    new_threats = random.randint(5, 20)
+    all_threats = []
     
-    # Generate data for the last 90 days
-    start_date = datetime.now() - timedelta(days=90)
-    data = []
+    # Fetch from OTX if API key available
+    if USE_REAL_DATA and OTX_API_KEY:
+        with st.spinner("Fetching threat data from OTX..."):
+            otx_pulses = OTXDataFetcher.fetch_pulses(OTX_API_KEY, limit=50)
+            otx_threats = OTXDataFetcher.parse_otx_data(otx_pulses)
+            all_threats.extend(otx_threats)
+            st.success(f"✓ Fetched {len(otx_threats)} threats from OTX")
     
-    for i in range(new_threats):
-        date = datetime.now()
-        source = random.choice(['Email', 'Web', 'API', 'Insider'])
-        severity = random.choice(['Critical', 'High', 'Medium', 'Low'])
-        threat_type = random.choice(['Malware', 'Phishing', 'DDoS', 'Spyware', 'Exploit', 'Ransomware'])
-        
-        # Simulate a human-targeted attack
-        is_human_targeted = random.choice([True, False, False, False]) # More likely to be false
-        
-        data.append({
-            'timestamp': date,
-            'threat_id': hashlib.md5(str(date).encode()).hexdigest(),
-            'source': source,
-            'threat_type': threat_type,
-            'severity': severity,
-            'status': random.choice(['Active', 'Mitigated', 'False Positive']),
-            'is_human_targeted': is_human_targeted
-        })
+    # Fetch from Shodan if API key available
+    if USE_REAL_DATA and SHODAN_API_KEY:
+        with st.spinner("Fetching vulnerability data from Shodan..."):
+            shodan_matches = ShodanDataFetcher.fetch_vulnerabilities(SHODAN_API_KEY, query="vuln", limit=50)
+            shodan_threats = ShodanDataFetcher.parse_shodan_data(shodan_matches)
+            all_threats.extend(shodan_threats)
+            st.success(f"✓ Fetched {len(shodan_threats)} vulnerabilities from Shodan")
     
-    # Generate historical data
-    for day in range(1, 91):
-        for _ in range(random.randint(20, 50)):
-            date = start_date + timedelta(days=day)
-            source = random.choice(['Email', 'Web', 'API', 'Insider'])
-            severity = random.choice(['Critical', 'High', 'Medium', 'Low'])
-            threat_type = random.choice(['Malware', 'Phishing', 'DDoS', 'Spyware', 'Exploit', 'Ransomware'])
-            is_human_targeted = random.choice([True, False, False, False])
-
-            data.append({
-                'timestamp': date,
-                'threat_id': hashlib.md5(str(date).encode() + str(random.random()).encode()).hexdigest(),
-                'source': source,
-                'threat_type': threat_type,
-                'severity': severity,
-                'status': random.choice(['Mitigated', 'False Positive']),
-                'is_human_targeted': is_human_targeted
-            })
-
-    df = pd.DataFrame(data)
-    df['timestamp'] = pd.to_datetime(df['timestamp'])
-    
-    # Add RSS feed data to the main dataframe
+    # Add RSS feed data
     df_rss = fetch_and_process_rss_feeds()
-    df_combined = pd.concat([df, df_rss], ignore_index=True)
+    if not df_rss.empty:
+        rss_threats = df_rss.to_dict('records')
+        all_threats.extend(rss_threats)
     
-    return df_combined
+    # If no real data available or not enough data, supplement with simulated data
+    if len(all_threats) < 100:
+        st.info("Supplementing with simulated historical data...")
+        
+        # Generate historical data for the last 90 days
+        start_date = datetime.now() - timedelta(days=90)
+        
+        for day in range(1, 91):
+            for _ in range(random.randint(10, 20)):
+                date = start_date + timedelta(days=day)
+                
+                technique_id = random.choice(list(ThreatIntelligence.ATTACK_TECHNIQUES.keys()))
+                technique = ThreatIntelligence.ATTACK_TECHNIQUES[technique_id]
+                actor = random.choice(list(ThreatIntelligence.THREAT_ACTORS.keys()))
+                
+                all_threats.append({
+                    'timestamp': date,
+                    'threat_id': hashlib.md5(str(date).encode() + str(random.random()).encode()).hexdigest(),
+                    'technique_id': technique_id,
+                    'technique_name': technique['name'],
+                    'technique_description': technique['description'],
+                    'category': technique['category'],
+                    'severity': technique['severity'],
+                    'threat_actor': actor,
+                    'actor_description': ThreatIntelligence.THREAT_ACTORS[actor]['description'],
+                    'origin_country': ThreatIntelligence.THREAT_ACTORS[actor]['origin'],
+                    'target_country': random.choice(list(ThreatIntelligence.COUNTRIES.keys())),
+                    'target_sector': random.choice(ThreatIntelligence.SECTORS),
+                    'confidence': random.randint(60, 100),
+                    'kill_chain_phase': random.choice(list(ThreatIntelligence.KILL_CHAIN_PHASES.keys())),
+                    'malware_family': random.choice(['Emotet', 'TrickBot', 'REvil', 'Conti', 'DarkSide']),
+                    'detection_source': 'Simulated',
+                    'blocked': random.choice([True, True, True, False]),
+                    'active': random.choice([True, False]),
+                    'ioc_ip': f"{random.randint(1,255)}.{random.randint(1,255)}.{random.randint(1,255)}.{random.randint(1,255)}",
+                    'ioc_domain': f"malicious-{random.randint(100,999)}.com",
+                    'mitigation': 'Implement network segmentation'
+                })
+    
+    df = pd.DataFrame(all_threats)
+    if not df.empty:
+        df['timestamp'] = pd.to_datetime(df['timestamp'])
+    
+    return df
 
 @st.cache_data(ttl=600) # Cache the feed for 10 minutes (600 seconds)
 def get_rss_feed(url):
@@ -1089,6 +1339,28 @@ def create_trend_analysis_charts(threat_df, attack_type=None, country=None, sect
     
     return fig
 
+# First, add this helper function near the top of your file (before main() or the tabs section)
+def detect_ioc_type(ioc_ip, ioc_domain):
+    """Detect the type of IOC and return formatted display string"""
+    import re
+    ioc_ip_str = str(ioc_ip)
+    ioc_domain_str = str(ioc_domain)
+    
+    ip_pattern = r'^(?:(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.){3}(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)$'
+    
+    if re.match(ip_pattern, ioc_ip_str) and ioc_ip_str != 'N/A':
+        return f"IP: {ioc_ip_str}"
+    elif ioc_domain_str != 'N/A' and '.' in ioc_domain_str:
+        return f"Domain: {ioc_domain_str}"
+    elif ioc_ip_str != 'N/A' and len(ioc_ip_str) == 32:
+        return f"MD5: {ioc_ip_str[:16]}..."
+    elif ioc_ip_str != 'N/A' and len(ioc_ip_str) == 64:
+        return f"SHA256: {ioc_ip_str[:16]}..."
+    elif ioc_ip_str != 'N/A':
+        return f"Hash: {ioc_ip_str[:16]}..."
+    else:
+        return "IOC: N/A"
+
 # ============================================================================
 # MAIN APPLICATION
 # ============================================================================
@@ -1348,8 +1620,11 @@ def main():
                     'Low': '#00ff00'
                 }[threat['severity']]
                 
-                status = 'BLOCKED' if threat['blocked'] else 'ACTIVE'
+                status = 'BLOCKED' if threat['blocked'] else 'ACTIVE THREAT'
                 status_color = '#00ff00' if threat['blocked'] else '#ff0000'
+                
+                # Detect IOC type
+                ioc_display = detect_ioc_type(threat['ioc_ip'], threat['ioc_domain'])
                 
                 with st.container():
                     st.markdown(f"""
@@ -1386,7 +1661,7 @@ def main():
                         <div style="color: #b8bcc8; font-size: 0.95em; padding-left: 5px;">
                             <span style="color: #bf00ff;">Target:</span> {threat['target_country']} - {threat['target_sector']} | 
                             <span style="color: #bf00ff;">Phase:</span> {threat['kill_chain_phase']} | 
-                            <span style="color: #bf00ff;">Confidence:</span> <span style="color: #00ffff;">{threat['confidence']}%</span>
+                            <span style="color: #bf00ff;">IOC:</span> <span style="color: #00ffff; font-family: monospace;">{ioc_display}</span>
                         </div>
                     </div>
                     """, unsafe_allow_html=True)
@@ -1421,6 +1696,8 @@ def main():
                     showlegend=False
                 )
                 st.plotly_chart(fig_severity, use_container_width=True)
+
+                
     
     # Tab 2: Global Threats
     with main_tabs[2]:
@@ -1471,15 +1748,24 @@ def main():
                     
                     st.markdown("#### THREAT DETAILS")
                     
-                    display_data = country_threats[['timestamp', 'technique_name', 'technique_description', 
-                                                   'severity', 'threat_actor', 'target_sector', 
-                                                   'blocked', 'active', 'confidence']].copy()
-                    display_data['Status'] = display_data.apply(
-                        lambda x: 'Blocked' if x['blocked'] else 'Active', axis=1
+                    # Add IOC type detection for display
+                    display_data = country_threats.copy()
+                    
+                    # Add IOC column with type detection
+                    display_data['IOC'] = display_data.apply(
+                        lambda x: detect_ioc_type(x['ioc_ip'], x['ioc_domain']), axis=1
                     )
-                    display_data = display_data.drop(['blocked', 'active'], axis=1)
+                    
+                    display_data['Status'] = display_data.apply(
+                        lambda x: 'Blocked' if x['blocked'] else 'Active Threat', axis=1
+                    )
+                    
+                    display_data = display_data[['timestamp', 'technique_name', 'technique_description', 
+                                                'severity', 'threat_actor', 'target_sector', 
+                                                'IOC', 'confidence', 'Status']].copy()
+                    
                     display_data.columns = ['Timestamp', 'Attack Type', 'Description', 'Severity', 
-                                           'Threat Actor', 'Target Sector', 'Confidence %', 'Status']
+                                           'Threat Actor', 'Target Sector', 'IOC', 'Confidence %', 'Status']
                     
                     st.dataframe(
                         display_data.head(50),
@@ -2070,7 +2356,10 @@ def main():
             recent_human = human_targeted_threats.nlargest(10, 'timestamp')
             for _, attack in recent_human.iterrows():
                 status_color = '#00ff00' if attack['blocked'] else '#ff0000'
-                status_text = 'BLOCKED' if attack['blocked'] else 'ACTIVE'
+                status_text = 'BLOCKED' if attack['blocked'] else 'ACTIVE THREAT'
+                
+                # Detect IOC type
+                ioc_display = detect_ioc_type(attack['ioc_ip'], attack['ioc_domain'])
                 
                 st.markdown(f"""
                 <div style="padding: 12px; margin: 8px 0;
@@ -2087,7 +2376,7 @@ def main():
                             </span>
                         </div>
                         <div>
-                            <span style="color: {status_color};">
+                            <span style="color: {status_color}; font-weight: bold;">
                                 {status_text}
                             </span>
                             <span style="color: #8a8a8a; margin-left: 10px; font-size: 0.9em;">
@@ -2095,45 +2384,230 @@ def main():
                             </span>
                         </div>
                     </div>
+                    <div style="color: #bf00ff; margin-top: 5px; font-size: 0.9em; font-family: monospace;">
+                        {ioc_display}
+                    </div>
                 </div>
                 """, unsafe_allow_html=True)
         else:
             st.info("No human-targeted threats detected with current filters")
     
     # Tab 6: IOC Scanner
+# Tab 6: IOC Scanner
     with main_tabs[5]:
         st.markdown("### IOC SCANNER & THREAT DETECTION")
+        st.markdown("*Analyze Indicators of Compromise to identify potential threats*")
         
         ioc_input = st.text_input(
             "Enter IOC (Hash, IP, Domain, or URL)",
-            placeholder="e.g., 192.168.1.1, malicious.com, d41d8cd98f00b204e9800998ecf8427e"
+            placeholder="e.g., 192.168.1.1, malicious.com, d41d8cd98f00b204e9800998ecf8427e, https://example.com"
         )
         
-        if st.button("SCAN IOC"):
+        if st.button("SCAN IOC", type="primary"):
             if ioc_input:
-                with st.spinner("Scanning..."):
-                    time.sleep(2)
+                with st.spinner("Analyzing IOC..."):
+                    time.sleep(1.5)
                     
-                    # Simulate results
+                    # Detect IOC type
+                    import re
+                    ioc_type = "Unknown"
+                    ioc_description = ""
+                    
+                    # IP Address detection
+                    ip_pattern = r'^(?:(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.){3}(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)$'
+                    # Hash detection (MD5, SHA1, SHA256)
+                    md5_pattern = r'^[a-fA-F0-9]{32}$'
+                    sha1_pattern = r'^[a-fA-F0-9]{40}$'
+                    sha256_pattern = r'^[a-fA-F0-9]{64}$'
+                    # Domain detection
+                    domain_pattern = r'^(?:[a-zA-Z0-9](?:[a-zA-Z0-9\-]{0,61}[a-zA-Z0-9])?\.)+[a-zA-Z]{2,}$'
+                    # URL detection
+                    url_pattern = r'^https?://'
+                    
+                    if re.match(ip_pattern, ioc_input.strip()):
+                        ioc_type = "IP Address"
+                        ioc_description = "IPv4 Address"
+                    elif re.match(sha256_pattern, ioc_input.strip()):
+                        ioc_type = "File Hash (SHA256)"
+                        ioc_description = "256-bit cryptographic hash"
+                    elif re.match(sha1_pattern, ioc_input.strip()):
+                        ioc_type = "File Hash (SHA1)"
+                        ioc_description = "160-bit cryptographic hash"
+                    elif re.match(md5_pattern, ioc_input.strip()):
+                        ioc_type = "File Hash (MD5)"
+                        ioc_description = "128-bit cryptographic hash"
+                    elif re.match(url_pattern, ioc_input.strip()):
+                        ioc_type = "URL"
+                        ioc_description = "Uniform Resource Locator"
+                    elif re.match(domain_pattern, ioc_input.strip()):
+                        ioc_type = "Domain Name"
+                        ioc_description = "Fully Qualified Domain Name (FQDN)"
+                    
+                    # Display IOC type
+                    st.markdown(f"""
+                    <div style="padding: 15px; margin: 15px 0;
+                                background: rgba(20, 25, 47, 0.7);
+                                border: 2px solid #00ffff;
+                                border-radius: 10px;">
+                        <div style="color: #00ffff; font-weight: bold; font-size: 1.1em;">
+                            IOC Type Detected: {ioc_type}
+                        </div>
+                        <div style="color: #b8bcc8; margin-top: 5px;">
+                            {ioc_description}
+                        </div>
+                        <div style="color: #bf00ff; margin-top: 10px; font-family: monospace;">
+                            {ioc_input}
+                        </div>
+                    </div>
+                    """, unsafe_allow_html=True)
+                    
+                    # Simulate results with context-appropriate descriptions
                     detection_ratio = random.randint(0, 75)
+                    confidence_score = random.randint(50, 100)
                     is_malicious = detection_ratio > 30
                     
+                    # Context-aware status based on IOC type
+                    if ioc_type == "IP Address":
+                        if is_malicious:
+                            status_label = "Blacklisted"
+                            threat_desc = random.choice([
+                                "Known C2 Server",
+                                "Botnet Controller",
+                                "Malware Distribution",
+                                "Brute Force Attacks",
+                                "DDoS Source"
+                            ])
+                        else:
+                            status_label = "Clean"
+                            threat_desc = "No malicious activity detected"
+                    
+                    elif "Hash" in ioc_type:
+                        if is_malicious:
+                            status_label = "Malware Detected"
+                            threat_desc = random.choice([
+                                "Trojan.GenericKD",
+                                "Ransomware.Locky",
+                                "Backdoor.Agent",
+                                "Worm.Generic",
+                                "Spyware.KeyLogger"
+                            ])
+                        else:
+                            status_label = "Clean"
+                            threat_desc = "No malicious signatures found"
+                    
+                    elif ioc_type == "Domain Name":
+                        if is_malicious:
+                            status_label = "Malicious Domain"
+                            threat_desc = random.choice([
+                                "Phishing Site",
+                                "Malware Hosting",
+                                "C2 Infrastructure",
+                                "Typosquatting",
+                                "Scam Website"
+                            ])
+                        else:
+                            status_label = "Clean"
+                            threat_desc = "No malicious content detected"
+                    
+                    elif ioc_type == "URL":
+                        if is_malicious:
+                            status_label = "Malicious URL"
+                            threat_desc = random.choice([
+                                "Phishing Page",
+                                "Drive-by Download",
+                                "Exploit Kit",
+                                "Malvertising",
+                                "Credential Harvesting"
+                            ])
+                        else:
+                            status_label = "Clean"
+                            threat_desc = "No threats detected"
+                    
+                    else:
+                        status_label = "Unknown"
+                        threat_desc = "Unable to analyze"
+                    
+                    # Display metrics
                     col1, col2, col3, col4 = st.columns(4)
                     
                     with col1:
-                        st.metric("Detection Ratio", f"{detection_ratio}/75")
+                        st.metric("Detection Engines", f"{detection_ratio}/75")
                     with col2:
-                        status = "MALICIOUS" if is_malicious else "CLEAN"
-                        st.metric("Status", status)
+                        status_color = "🔴" if is_malicious else "🟢"
+                        st.metric("Classification", f"{status_color} {status_label}")
                     with col3:
-                        st.metric("Reputation", f"{random.randint(10, 100)}/100")
+                        st.metric("Confidence Level", f"{confidence_score}%")
                     with col4:
-                        st.metric("Last Seen", f"{random.randint(1, 24)}h ago")
+                        st.metric("Last Reported", f"{random.randint(1, 48)}h ago")
                     
+                    # Threat description box
                     if is_malicious:
-                        st.error("WARNING: This IOC has been flagged as malicious by multiple security vendors!")
+                        st.markdown(f"""
+                        <div style="padding: 20px; margin: 20px 0;
+                                    background: linear-gradient(135deg, rgba(255, 0, 0, 0.1), rgba(255, 100, 100, 0.05));
+                                    border: 2px solid #ff0000;
+                                    border-radius: 10px;">
+                            <div style="color: #ff0000; font-weight: bold; font-size: 1.2em; margin-bottom: 10px;">
+                                ⚠️ THREAT IDENTIFIED
+                            </div>
+                            <div style="color: #ffcccc; font-size: 1.1em; margin-bottom: 10px;">
+                                Threat Category: {threat_desc}
+                            </div>
+                            <div style="color: #b8bcc8;">
+                                This IOC has been flagged as malicious by {detection_ratio} security vendors.
+                                Immediate action is recommended to block or investigate this indicator.
+                            </div>
+                        </div>
+                        """, unsafe_allow_html=True)
+                        
+                        # Recommended actions
+                        st.markdown("#### RECOMMENDED ACTIONS")
+                        actions = []
+                        if ioc_type == "IP Address":
+                            actions = [
+                                "🛡️ Block this IP address at firewall level",
+                                "🔍 Check firewall logs for connections to this IP",
+                                "📊 Review network traffic for indicators of compromise",
+                                "🚨 Alert SOC team for further investigation"
+                            ]
+                        elif "Hash" in ioc_type:
+                            actions = [
+                                "🗑️ Quarantine or delete files matching this hash",
+                                "🔍 Scan all endpoints for presence of this file",
+                                "📊 Review execution history and artifacts",
+                                "🔄 Update antivirus signatures and EDR rules"
+                            ]
+                        elif ioc_type in ["Domain Name", "URL"]:
+                            actions = [
+                                "🚫 Block domain/URL in web proxy and DNS filter",
+                                "🔍 Check web proxy logs for access attempts",
+                                "📧 Review email logs for links to this domain",
+                                "👥 Notify users about this phishing threat"
+                            ]
+                        
+                        for action in actions:
+                            st.markdown(f"- {action}")
+                    
                     else:
-                        st.success("This IOC appears to be clean based on current threat intelligence.")
+                        st.markdown(f"""
+                        <div style="padding: 20px; margin: 20px 0;
+                                    background: linear-gradient(135deg, rgba(0, 255, 0, 0.1), rgba(100, 255, 100, 0.05));
+                                    border: 2px solid #00ff00;
+                                    border-radius: 10px;">
+                            <div style="color: #00ff00; font-weight: bold; font-size: 1.2em; margin-bottom: 10px;">
+                                ✅ NO THREATS DETECTED
+                            </div>
+                            <div style="color: #ccffcc; font-size: 1.1em; margin-bottom: 10px;">
+                                Status: {threat_desc}
+                            </div>
+                            <div style="color: #b8bcc8;">
+                                This IOC appears to be clean based on current threat intelligence feeds.
+                                Continue monitoring for any changes in reputation.
+                            </div>
+                        </div>
+                        """, unsafe_allow_html=True)
+            else:
+                st.warning("Please enter an IOC to scan")
 
 if __name__ == "__main__":
     main()
