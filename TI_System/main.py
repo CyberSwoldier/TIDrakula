@@ -276,22 +276,27 @@ class OTXDataFetcher:
         
         return threats
 
-class ShodanDataFetcher:
-    """Fetch vulnerability and exposure data from Shodan"""
+class AbuseIPDBDataFetcher:
+    """Fetch threat intelligence from AbuseIPDB"""
     
     @staticmethod
-    @st.cache_data(ttl=600)  # Cache for 10 minutes
-    def fetch_vulnerabilities(api_key, query="vuln", limit=100):
-        """Fetch vulnerability data from Shodan"""
+    @st.cache_data(ttl=600)
+    def fetch_blacklist(api_key, confidence_minimum=90, limit=10000):
+        """Fetch blacklisted IPs from AbuseIPDB"""
         if not api_key:
             return []
         
+        headers = {
+            'Key': api_key,
+            'Accept': 'application/json'
+        }
+        
         try:
             response = requests.get(
-                "https://api.shodan.io/shodan/host/search",
+                "https://api.abuseipdb.com/api/v2/blacklist",
+                headers=headers,
                 params={
-                    'key': api_key,
-                    'query': query,
+                    'confidenceMinimum': confidence_minimum,
                     'limit': limit
                 },
                 timeout=10
@@ -299,12 +304,12 @@ class ShodanDataFetcher:
             
             if response.status_code == 200:
                 data = response.json()
-                return data.get('matches', [])
+                return data.get('data', [])
             else:
-                st.error(f"Shodan API Error: {response.status_code}")
+                st.error(f"AbuseIPDB API Error: {response.status_code}")
                 return []
         except Exception as e:
-            st.error(f"Shodan Fetch Error: {str(e)}")
+            st.error(f"AbuseIPDB Fetch Error: {str(e)}")
             return []
     
     @staticmethod
