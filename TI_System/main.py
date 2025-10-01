@@ -36,7 +36,7 @@ except:
     st.warning("API keys not found in secrets. Using simulated data.")
     OTX_API_KEY=None
     SHODAN_API_KEY=None
-    USE_REAL_DATA=False
+    USE_REAL_DATA=True
 
 # Page configuration
 st.set_page_config(
