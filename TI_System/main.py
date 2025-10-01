@@ -140,32 +140,39 @@ class OTXDataFetcher:
     
     BASE_URL = "https://otx.alienvault.com/api/v1"
     
-    @staticmethod
-    @st.cache_data(ttl=300)  # Cache for 5 minutes
-    def fetch_pulses(api_key, limit=100):
-        """Fetch threat pulses from OTX"""
-        if not api_key:
-            return []
-        
-        headers = {'X-OTX-API-KEY': api_key}
-        
+@staticmethod
+@st.cache_data(ttl=300)
+def fetch_pulses(api_key, limit=100):
+    """Fetch threat pulses from OTX with retries"""
+    if not api_key:
+        return []
+    
+    headers = {'X-OTX-API-KEY': api_key}
+    max_retries = 3
+    
+    for attempt in range(max_retries):
         try:
             response = requests.get(
                 f"{OTXDataFetcher.BASE_URL}/pulses/subscribed",
                 headers=headers,
                 params={'limit': limit},
-                timeout=10
+                timeout=30
             )
             
             if response.status_code == 200:
                 data = response.json()
                 return data.get('results', [])
             else:
-                st.error(f"❌ OTX API Error: {response.status_code} - {response.text}")
-                return []
+                st.warning(f"OTX API returned status {response.status_code}, attempt {attempt+1}/{max_retries}")
+        except requests.exceptions.Timeout:
+            st.warning(f"OTX timeout on attempt {attempt+1}/{max_retries}, retrying...")
+            time.sleep(2)
         except Exception as e:
-            st.error(f"❌ OTX Fetch Error: {str(e)}")
-            return []
+            st.warning(f"OTX error on attempt {attempt+1}/{max_retries}: {str(e)}")
+            time.sleep(2)
+    
+    st.error("Failed to fetch from OTX after 3 attempts")
+    return []
     
     @staticmethod
     def parse_otx_data(pulses):
