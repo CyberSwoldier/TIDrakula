@@ -521,6 +521,7 @@ def generate_data():
     Generates threat intelligence data from REAL APIs only (OTX, AbuseIPDB, RSS)
     NO SIMULATED DATA
     """
+    st.warning(" generate_data() called - fetching REAL data only")
     all_threats = []
     
     # Fetch from OTX
@@ -1312,14 +1313,11 @@ def main():
     
     # Initialize session state
     if 'threat_data' not in st.session_state:
-        st.session_state.threat_data = ThreatIntelligence.generate_threat_feed(1000)
+        st.session_state.threat_data = generate_data()
     
-    # Auto-update check (every 5 minutes)
     if check_auto_update():
-        # Add new threats to simulate real-time updates
-        new_threats = ThreatIntelligence.generate_threat_feed(10)
-        st.session_state.threat_data = pd.concat([new_threats, st.session_state.threat_data]).reset_index(drop=True)
-        st.session_state.threat_data = st.session_state.threat_data.head(1000)  # Keep only latest 1000
+    # Re-fetch real data
+        st.session_state.threat_data = generate_data()
     
     # Calculate time until next update
     seconds_since_update = (datetime.now() - st.session_state.last_update).total_seconds()
