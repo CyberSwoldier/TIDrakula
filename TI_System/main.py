@@ -27,9 +27,10 @@ from sklearn.cluster import KMeans
 import warnings
 warnings.filterwarnings('ignore')
 
+# API Configuration
 try:
     OTX_API_KEY = st.secrets["OTX_API_KEY"]
-    SHODAN_API_KEY = st.secrets["SHODAN_API_KEY"]  # Actually contains AbuseIPDB key
+    SHODAN_API_KEY = st.secrets["SHODAN_API_KEY"]
     USE_REAL_DATA = True
 except:
     st.warning("API keys not found in secrets. Using simulated data.")
@@ -163,7 +164,7 @@ class OTXDataFetcher:
     
     @staticmethod
     @st.cache_data(ttl=600)  # Cache for 10 minutes
-    def fetch_pulses(api_key, limit=500):
+    def fetch_pulses(api_key, limit=50):
         """Fetch threat pulses from OTX"""
         if not api_key:
             return []
@@ -280,13 +281,13 @@ class AbuseIPDBDataFetcher:
     
     @staticmethod
     @st.cache_data(ttl=600)
-    def fetch_blacklist(SHODAN_API_KEY, confidence_minimum=80, limit=10000):
+    def fetch_blacklist(api_key, confidence_minimum=90, limit=10000):
         """Fetch blacklisted IPs from AbuseIPDB"""
-        if not SHODAN_API_KEY:
+        if not api_key:
             return []
         
         headers = {
-            'Key': SHODAN_API_KEY,
+            'Key': api_key,
             'Accept': 'application/json'
         }
         
@@ -313,7 +314,7 @@ class AbuseIPDBDataFetcher:
     
     @staticmethod
     def parse_shodan_data(matches):
-        """Convert AbuseIPDB data to threat data format"""
+        """Convert Shodan data to threat data format"""
         threats = []
         
         for match in matches:
@@ -582,7 +583,45 @@ def generate_data():
     if not df_rss.empty:
         rss_threats = df_rss.to_dict('records')
         all_threats.extend(rss_threats)
-       
+    
+    # If no real data available or not enough data, supplement with simulated data
+    if len(all_threats) < 100:
+        st.info("Supplementing with simulated historical data...")
+        
+        # Generate historical data for the last 90 days
+        start_date = datetime.now() - timedelta(days=90)
+        
+        for day in range(1, 91):
+            for _ in range(random.randint(10, 20)):
+                date = start_date + timedelta(days=day)
+                
+                technique_id = random.choice(list(ThreatIntelligence.ATTACK_TECHNIQUES.keys()))
+                technique = ThreatIntelligence.ATTACK_TECHNIQUES[technique_id]
+                actor = random.choice(list(ThreatIntelligence.THREAT_ACTORS.keys()))
+                
+                all_threats.append({
+                    'timestamp': date,
+                    'threat_id': hashlib.md5(str(date).encode() + str(random.random()).encode()).hexdigest(),
+                    'technique_id': technique_id,
+                    'technique_name': technique['name'],
+                    'technique_description': technique['description'],
+                    'category': technique['category'],
+                    'severity': technique['severity'],
+                    'threat_actor': actor,
+                    'actor_description': ThreatIntelligence.THREAT_ACTORS[actor]['description'],
+                    'origin_country': ThreatIntelligence.THREAT_ACTORS[actor]['origin'],
+                    'target_country': random.choice(list(ThreatIntelligence.COUNTRIES.keys())),
+                    'target_sector': random.choice(ThreatIntelligence.SECTORS),
+                    'confidence': random.randint(60, 100),
+                    'kill_chain_phase': random.choice(list(ThreatIntelligence.KILL_CHAIN_PHASES.keys())),
+                    'malware_family': random.choice(['Emotet', 'TrickBot', 'REvil', 'Conti', 'DarkSide']),
+                    'detection_source': 'Simulated',
+                    'blocked': random.choice([True, True, True, False]),
+                    'active': random.choice([True, False]),
+                    'ioc_ip': f"{random.randint(1,255)}.{random.randint(1,255)}.{random.randint(1,255)}.{random.randint(1,255)}",
+                    'ioc_domain': f"malicious-{random.randint(100,999)}.com",
+                    'mitigation': 'Implement network segmentation'
+                })
     
     df = pd.DataFrame(all_threats)
     if not df.empty:
