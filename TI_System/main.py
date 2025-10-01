@@ -29,7 +29,7 @@ warnings.filterwarnings('ignore')
 # Page configuration
 st.set_page_config(
     page_title="Threat Intelligence Platform - TIP",
-    page_icon=" ",
+    page_icon="🛡️",
     layout="wide",
     initial_sidebar_state="expanded"
 )
@@ -1089,6 +1089,27 @@ def create_trend_analysis_charts(threat_df, attack_type=None, country=None, sect
     
     return fig
 
+# First, add this helper function near the top of your file (before main() or the tabs section)
+def detect_ioc_type(ioc_ip, ioc_domain):
+    """Detect the type of IOC and return formatted display string"""
+    import re
+    ioc_ip_str = str(ioc_ip)
+    ioc_domain_str = str(ioc_domain)
+    
+    ip_pattern = r'^(?:(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)\.){3}(?:25[0-5]|2[0-4][0-9]|[01]?[0-9][0-9]?)$'
+    
+    if re.match(ip_pattern, ioc_ip_str) and ioc_ip_str != 'N/A':
+        return f"IP: {ioc_ip_str}"
+    elif ioc_domain_str != 'N/A' and '.' in ioc_domain_str:
+        return f"Domain: {ioc_domain_str}"
+    elif ioc_ip_str != 'N/A' and len(ioc_ip_str) == 32:
+        return f"MD5: {ioc_ip_str[:16]}..."
+    elif ioc_ip_str != 'N/A' and len(ioc_ip_str) == 64:
+        return f"SHA256: {ioc_ip_str[:16]}..."
+    elif ioc_ip_str != 'N/A':
+        return f"Hash: {ioc_ip_str[:16]}..."
+    else:
+        return "IOC: N/A"
 # ============================================================================
 # MAIN APPLICATION
 # ============================================================================
@@ -1348,8 +1369,11 @@ def main():
                     'Low': '#00ff00'
                 }[threat['severity']]
                 
-                status = 'BLOCKED' if threat['blocked'] else 'ACTIVE'
+                status = 'BLOCKED' if threat['blocked'] else 'ACTIVE THREAT'
                 status_color = '#00ff00' if threat['blocked'] else '#ff0000'
+                
+                # Detect IOC type
+                ioc_display = detect_ioc_type(threat['ioc_ip'], threat['ioc_domain'])
                 
                 with st.container():
                     st.markdown(f"""
@@ -1386,7 +1410,7 @@ def main():
                         <div style="color: #b8bcc8; font-size: 0.95em; padding-left: 5px;">
                             <span style="color: #bf00ff;">Target:</span> {threat['target_country']} - {threat['target_sector']} | 
                             <span style="color: #bf00ff;">Phase:</span> {threat['kill_chain_phase']} | 
-                            <span style="color: #bf00ff;">Confidence:</span> <span style="color: #00ffff;">{threat['confidence']}%</span>
+                            <span style="color: #bf00ff;">IOC:</span> <span style="color: #00ffff; font-family: monospace;">{ioc_display}</span>
                         </div>
                     </div>
                     """, unsafe_allow_html=True)
