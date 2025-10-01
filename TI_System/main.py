@@ -280,13 +280,13 @@ class AbuseIPDBDataFetcher:
     
     @staticmethod
     @st.cache_data(ttl=600)
-    def fetch_blacklist(api_key, confidence_minimum=80, limit=10000):
+    def fetch_blacklist(SHODAN_API_KEY, confidence_minimum=80, limit=10000):
         """Fetch blacklisted IPs from AbuseIPDB"""
-        if not api_key:
+        if not SHODAN_API_KEY:
             return []
         
         headers = {
-            'Key': api_key,
+            'Key': SHODAN_API_KEY,
             'Accept': 'application/json'
         }
         
@@ -313,7 +313,7 @@ class AbuseIPDBDataFetcher:
     
     @staticmethod
     def parse_shodan_data(matches):
-        """Convert Shodan data to threat data format"""
+        """Convert AbuseIPDB data to threat data format"""
         threats = []
         
         for match in matches:
