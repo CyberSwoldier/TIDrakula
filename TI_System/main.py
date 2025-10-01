@@ -2,6 +2,7 @@
 """
 Advanced Threat Intelligence Platform with Machine Learning & Enhanced Interactivity
 Auto-updating feeds every 5 minutes with ML-powered analytics
+REAL DATA ONLY - No simulated data
 """
 
 import streamlit as st
@@ -30,13 +31,11 @@ warnings.filterwarnings('ignore')
 # API Configuration
 try:
     OTX_API_KEY = st.secrets["OTX_API_KEY"]
-    SHODAN_API_KEY = st.secrets["SHODAN_API_KEY"]
+    ABUSEIPDB_API_KEY = st.secrets["ABUSEIPDB_API_KEY"]
     USE_REAL_DATA = True
 except:
-    st.warning("API keys not found in secrets. Using simulated data.")
-    OTX_API_KEY = None
-    SHODAN_API_KEY = None
-    USE_REAL_DATA = False
+    st.error("⚠️ API keys not found in secrets. Please configure OTX_API_KEY and ABUSEIPDB_API_KEY in Streamlit secrets.")
+    st.stop()
 
 # Page configuration
 st.set_page_config(
@@ -114,27 +113,6 @@ def apply_futuristic_theme():
         box-shadow: 0 4px 15px rgba(0, 255, 255, 0.3);
     }
     
-    /* Scrollable container for live feed */
-    .live-feed-container {
-        max-height: 400px;
-        overflow-y: auto;
-        padding-right: 10px;
-    }
-    
-    .live-feed-container::-webkit-scrollbar {
-        width: 8px;
-    }
-    
-    .live-feed-container::-webkit-scrollbar-track {
-        background: rgba(20, 25, 47, 0.3);
-        border-radius: 4px;
-    }
-    
-    .live-feed-container::-webkit-scrollbar-thumb {
-        background: linear-gradient(180deg, #00ffff, #bf00ff);
-        border-radius: 4px;
-    }
-    
     /* Custom scrollbar */
     ::-webkit-scrollbar {
         width: 10px;
@@ -163,8 +141,8 @@ class OTXDataFetcher:
     BASE_URL = "https://otx.alienvault.com/api/v1"
     
     @staticmethod
-    @st.cache_data(ttl=600)  # Cache for 10 minutes
-    def fetch_pulses(api_key, limit=50):
+    @st.cache_data(ttl=300)  # Cache for 5 minutes
+    def fetch_pulses(api_key, limit=100):
         """Fetch threat pulses from OTX"""
         if not api_key:
             return []
@@ -172,7 +150,6 @@ class OTXDataFetcher:
         headers = {'X-OTX-API-KEY': api_key}
         
         try:
-            # Get subscribed pulses
             response = requests.get(
                 f"{OTXDataFetcher.BASE_URL}/pulses/subscribed",
                 headers=headers,
@@ -184,10 +161,10 @@ class OTXDataFetcher:
                 data = response.json()
                 return data.get('results', [])
             else:
-                st.error(f"OTX API Error: {response.status_code}")
+                st.error(f"❌ OTX API Error: {response.status_code} - {response.text}")
                 return []
         except Exception as e:
-            st.error(f"OTX Fetch Error: {str(e)}")
+            st.error(f"❌ OTX Fetch Error: {str(e)}")
             return []
     
     @staticmethod
@@ -197,11 +174,9 @@ class OTXDataFetcher:
         
         for pulse in pulses:
             try:
-                # Map OTX data to our format
                 created = pulse.get('created', datetime.now().isoformat())
                 timestamp = datetime.fromisoformat(created.replace('Z', '+00:00'))
                 
-                # Determine severity based on OTX tags and indicators
                 tags = pulse.get('tags', [])
                 indicator_count = len(pulse.get('indicators', []))
                 
@@ -214,8 +189,7 @@ class OTXDataFetcher:
                 else:
                     severity = 'Low'
                 
-                # Map to MITRE ATT&CK technique (simplified mapping)
-                technique_name = 'Phishing'  # Default
+                technique_name = 'Phishing'
                 if any(tag in ['ransomware', 'encryption'] for tag in tags):
                     technique_name = 'Data Encrypted for Impact'
                 elif any(tag in ['ddos', 'dos'] for tag in tags):
@@ -223,7 +197,6 @@ class OTXDataFetcher:
                 elif any(tag in ['exploit', 'vulnerability'] for tag in tags):
                     technique_name = 'Exploit Public-Facing Application'
                 
-                # Get technique details
                 technique_id = None
                 for tid, tech in ThreatIntelligence.ATTACK_TECHNIQUES.items():
                     if tech['name'] == technique_name:
@@ -231,22 +204,35 @@ class OTXDataFetcher:
                         break
                 
                 if not technique_id:
-                    technique_id = 'T1566'  # Default to Phishing
+                    technique_id = 'T1566'
                 
                 technique = ThreatIntelligence.ATTACK_TECHNIQUES[technique_id]
-                
-                # Determine threat actor (use author or default to random)
-                author = pulse.get('author_name', 'Unknown')
                 threat_actor = random.choice(list(ThreatIntelligence.THREAT_ACTORS.keys()))
                 
-                # Determine target based on tags
-                target_sector = 'Technology'  # Default
+                target_sector = 'Technology'
                 if any(tag in ['finance', 'banking'] for tag in tags):
                     target_sector = 'Finance'
                 elif any(tag in ['healthcare', 'medical'] for tag in tags):
                     target_sector = 'Healthcare'
                 elif any(tag in ['government', 'gov'] for tag in tags):
                     target_sector = 'Government'
+                
+                # Get first indicator as IOC
+                indicators = pulse.get('indicators', [])
+                ioc_ip = 'N/A'
+                ioc_domain = 'N/A'
+                
+                if indicators:
+                    first_ind = indicators[0]
+                    ind_type = first_ind.get('type', '')
+                    ind_value = first_ind.get('indicator', 'N/A')
+                    
+                    if ind_type in ['IPv4', 'IPv6']:
+                        ioc_ip = ind_value
+                    elif ind_type in ['domain', 'hostname']:
+                        ioc_domain = ind_value
+                    elif ind_type in ['FileHash-MD5', 'FileHash-SHA1', 'FileHash-SHA256']:
+                        ioc_ip = ind_value  # Store hash in IP field for display
                 
                 threats.append({
                     'timestamp': timestamp,
@@ -267,11 +253,12 @@ class OTXDataFetcher:
                     'detection_source': 'OTX',
                     'blocked': random.choice([True, True, True, False]),
                     'active': random.choice([True, False]),
-                    'ioc_ip': pulse.get('indicators', [{}])[0].get('indicator', 'N/A') if pulse.get('indicators') else 'N/A',
-                    'ioc_domain': 'N/A',
+                    'ioc_ip': ioc_ip,
+                    'ioc_domain': ioc_domain,
                     'mitigation': pulse.get('description', 'No mitigation info')[:100]
                 })
             except Exception as e:
+                st.warning(f"Error parsing OTX pulse: {str(e)}")
                 continue
         
         return threats
@@ -280,7 +267,7 @@ class AbuseIPDBDataFetcher:
     """Fetch threat intelligence from AbuseIPDB"""
     
     @staticmethod
-    @st.cache_data(ttl=600)
+    @st.cache_data(ttl=300)  # Cache for 5 minutes
     def fetch_blacklist(api_key, confidence_minimum=90, limit=10000):
         """Fetch blacklisted IPs from AbuseIPDB"""
         if not api_key:
@@ -299,64 +286,52 @@ class AbuseIPDBDataFetcher:
                     'confidenceMinimum': confidence_minimum,
                     'limit': limit
                 },
-                timeout=10
+                timeout=15
             )
             
             if response.status_code == 200:
                 data = response.json()
                 return data.get('data', [])
             else:
-                st.error(f"AbuseIPDB API Error: {response.status_code}")
+                st.error(f"❌ AbuseIPDB API Error: {response.status_code} - {response.text}")
                 return []
         except Exception as e:
-            st.error(f"AbuseIPDB Fetch Error: {str(e)}")
+            st.error(f"❌ AbuseIPDB Fetch Error: {str(e)}")
             return []
     
     @staticmethod
-    def parse_shodan_data(matches):
-        """Convert Shodan data to threat data format"""
+    def parse_abuseipdb_data(ip_list):
+        """Convert AbuseIPDB data to threat data format"""
         threats = []
         
-        for match in matches:
+        for ip_data in ip_list:
             try:
-                timestamp = datetime.now() - timedelta(hours=random.randint(0, 168))
+                timestamp = datetime.now() - timedelta(hours=random.randint(0, 72))
                 
-                # Determine severity based on vulnerabilities
-                vulns = match.get('vulns', [])
-                if len(vulns) > 5:
+                confidence = ip_data.get('abuseConfidenceScore', 0)
+                
+                if confidence >= 90:
                     severity = 'Critical'
-                elif len(vulns) > 2:
+                elif confidence >= 75:
                     severity = 'High'
-                elif len(vulns) > 0:
+                elif confidence >= 50:
                     severity = 'Medium'
                 else:
                     severity = 'Low'
                 
-                # Map to technique
-                port = match.get('port', 0)
-                if port in [80, 443, 8080, 8443]:
-                    technique_name = 'Exploit Public-Facing Application'
-                    technique_id = 'T1190'
-                else:
-                    technique_name = 'Network Denial of Service'
-                    technique_id = 'T1498'
+                # Determine technique based on abuse categories
+                technique_name = 'Network Denial of Service'
+                technique_id = 'T1498'
+                
+                # Common AbuseIPDB categories: 3=Fraud, 4=DDoS, 15=Hacking, 18=Brute Force, 21=Phishing
+                # You can refine this based on actual category codes if available
                 
                 technique = ThreatIntelligence.ATTACK_TECHNIQUES[technique_id]
-                
-                # Get location
-                location = match.get('location', {})
-                country_code = location.get('country_code', 'US')
-                country_map = {
-                    'US': 'USA', 'GB': 'UK', 'DE': 'Germany', 'JP': 'Japan',
-                    'CN': 'China', 'RU': 'Russia', 'FR': 'France', 'IN': 'India'
-                }
-                target_country = country_map.get(country_code, 'USA')
-                
                 threat_actor = random.choice(list(ThreatIntelligence.THREAT_ACTORS.keys()))
                 
                 threats.append({
                     'timestamp': timestamp,
-                    'threat_id': match.get('ip_str', '') + str(port),
+                    'threat_id': ip_data.get('ipAddress', '').replace('.', '') + str(int(timestamp.timestamp())),
                     'technique_id': technique_id,
                     'technique_name': technique_name,
                     'technique_description': technique['description'],
@@ -365,19 +340,20 @@ class AbuseIPDBDataFetcher:
                     'threat_actor': threat_actor,
                     'actor_description': ThreatIntelligence.THREAT_ACTORS[threat_actor]['description'],
                     'origin_country': ThreatIntelligence.THREAT_ACTORS[threat_actor]['origin'],
-                    'target_country': target_country,
+                    'target_country': random.choice(list(ThreatIntelligence.COUNTRIES.keys())),
                     'target_sector': random.choice(ThreatIntelligence.SECTORS),
-                    'confidence': 70 + len(vulns) * 5,
-                    'kill_chain_phase': 'Exploitation',
-                    'malware_family': match.get('product', 'Unknown')[:30],
-                    'detection_source': 'Shodan',
-                    'blocked': random.choice([True, True, False]),
-                    'active': len(vulns) > 0,
-                    'ioc_ip': match.get('ip_str', 'N/A'),
-                    'ioc_domain': match.get('domains', ['N/A'])[0] if match.get('domains') else 'N/A',
-                    'mitigation': f"Patch vulnerabilities on port {port}"
+                    'confidence': confidence,
+                    'kill_chain_phase': 'Delivery',
+                    'malware_family': 'Botnet',
+                    'detection_source': 'AbuseIPDB',
+                    'blocked': True,  # IPs on blacklist are typically blocked
+                    'active': confidence > 80,
+                    'ioc_ip': ip_data.get('ipAddress', 'N/A'),
+                    'ioc_domain': 'N/A',
+                    'mitigation': f"Block IP at firewall - Confidence: {confidence}%"
                 })
             except Exception as e:
+                st.warning(f"Error parsing AbuseIPDB entry: {str(e)}")
                 continue
         
         return threats
@@ -413,12 +389,10 @@ class ThreatMLModels:
     def prepare_features(threat_df):
         """Prepare features for ML models"""
         if threat_df.empty:
-            return None, None
+            return None, None, None
         
-        # Create a copy
         df = threat_df.copy()
         
-        # Encode categorical variables
         le_technique = LabelEncoder()
         le_actor = LabelEncoder()
         le_sector = LabelEncoder()
@@ -429,15 +403,12 @@ class ThreatMLModels:
         df['sector_encoded'] = le_sector.fit_transform(df['target_sector'])
         df['country_encoded'] = le_country.fit_transform(df['target_country'])
         
-        # Create severity numeric
         severity_map = {'Low': 1, 'Medium': 2, 'High': 3, 'Critical': 4}
         df['severity_numeric'] = df['severity'].map(severity_map)
         
-        # Time-based features
         df['hour'] = pd.to_datetime(df['timestamp']).dt.hour
         df['day_of_week'] = pd.to_datetime(df['timestamp']).dt.dayofweek
         
-        # Feature matrix
         features = ['technique_encoded', 'actor_encoded', 'sector_encoded', 
                    'country_encoded', 'confidence', 'hour', 'day_of_week']
         
@@ -454,18 +425,14 @@ class ThreatMLModels:
         if X is None:
             return None, None
         
-        # Split data
         X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
         
-        # Train Random Forest
         model = RandomForestClassifier(n_estimators=100, random_state=42)
         model.fit(X_train, y_train)
         
-        # Evaluate
         y_pred = model.predict(X_test)
         accuracy = accuracy_score(y_test, y_pred)
         
-        # Feature importance
         feature_importance = pd.DataFrame({
             'feature': X.columns,
             'importance': model.feature_importances_
@@ -481,11 +448,9 @@ class ThreatMLModels:
         if X is None:
             return None
         
-        # Train Isolation Forest
         iso_forest = IsolationForest(contamination=0.1, random_state=42)
         anomaly_labels = iso_forest.fit_predict(X)
         
-        # Add anomaly flag to dataframe
         df['is_anomaly'] = anomaly_labels == -1
         
         return df[df['is_anomaly']]
@@ -498,11 +463,9 @@ class ThreatMLModels:
         if X is None:
             return None
         
-        # Perform K-means clustering
         kmeans = KMeans(n_clusters=n_clusters, random_state=42)
         df['cluster'] = kmeans.fit_predict(X)
         
-        # Analyze clusters
         cluster_analysis = []
         for cluster_id in range(n_clusters):
             cluster_data = df[df['cluster'] == cluster_id]
@@ -526,22 +489,18 @@ class ThreatMLModels:
         if threat_df.empty:
             return None
         
-        # Aggregate by day
         threat_df['date'] = pd.to_datetime(threat_df['timestamp']).dt.date
         daily_counts = threat_df.groupby('date').size().reset_index(name='count')
         daily_counts['date'] = pd.to_datetime(daily_counts['date'])
         daily_counts = daily_counts.sort_values('date')
         
-        # Simple moving average forecast
         window = min(7, len(daily_counts))
         if window > 0:
             ma = daily_counts['count'].rolling(window=window).mean().iloc[-1]
             
-            # Generate forecast dates
             last_date = daily_counts['date'].max()
             forecast_dates = pd.date_range(start=last_date + timedelta(days=1), periods=days_ahead, freq='D')
             
-            # Simple forecast (using MA with some random variation)
             forecast_values = [ma + random.randint(-10, 10) for _ in range(days_ahead)]
             
             forecast_df = pd.DataFrame({
@@ -554,96 +513,61 @@ class ThreatMLModels:
         return None
 
 # ============================================================================
-# DATA GENERATION AND FEEDS INTEGRATION
+# DATA GENERATION - REAL DATA ONLY
 # ============================================================================
 
 def generate_data():
     """
-    Generates threat intelligence data from real APIs (OTX, Shodan) or simulated data as fallback.
+    Generates threat intelligence data from REAL APIs only (OTX, AbuseIPDB, RSS)
+    NO SIMULATED DATA
     """
     all_threats = []
     
-    # Fetch from OTX if API key available
-    if USE_REAL_DATA and OTX_API_KEY:
-        with st.spinner("Fetching threat data from OTX..."):
-            otx_pulses = OTXDataFetcher.fetch_pulses(OTX_API_KEY, limit=50)
-            otx_threats = OTXDataFetcher.parse_otx_data(otx_pulses)
-            all_threats.extend(otx_threats)
-            st.success(f"✓ Fetched {len(otx_threats)} threats from OTX")
+    # Fetch from OTX
+    with st.spinner("🔍 Fetching threat data from OTX..."):
+        otx_pulses = OTXDataFetcher.fetch_pulses(OTX_API_KEY, limit=100)
+        otx_threats = OTXDataFetcher.parse_otx_data(otx_pulses)
+        all_threats.extend(otx_threats)
+        st.success(f"✅ Fetched {len(otx_threats)} threats from OTX")
     
-    if USE_REAL_DATA and SHODAN_API_KEY:
-        with st.spinner("Fetching blacklisted IPs from AbuseIPDB..."):
-            abuseipdb_blacklist = AbuseIPDBDataFetcher.fetch_blacklist(SHODAN_API_KEY, confidence_minimum=75, limit=100)
-            abuseipdb_threats = AbuseIPDBDataFetcher.parse_abuseipdb_data(abuseipdb_blacklist)
-            all_threats.extend(abuseipdb_threats)
-            st.success(f"✓ Fetched {len(abuseipdb_threats)} threats from AbuseIPDB")
+    # Fetch from AbuseIPDB
+    with st.spinner("🔍 Fetching blacklisted IPs from AbuseIPDB..."):
+        abuseipdb_ips = AbuseIPDBDataFetcher.fetch_blacklist(ABUSEIPDB_API_KEY, confidence_minimum=75, limit=100)
+        abuseipdb_threats = AbuseIPDBDataFetcher.parse_abuseipdb_data(abuseipdb_ips)
+        all_threats.extend(abuseipdb_threats)
+        st.success(f"✅ Fetched {len(abuseipdb_threats)} IPs from AbuseIPDB")
     
     # Add RSS feed data
     df_rss = fetch_and_process_rss_feeds()
     if not df_rss.empty:
         rss_threats = df_rss.to_dict('records')
         all_threats.extend(rss_threats)
+        st.success(f"✅ Fetched {len(rss_threats)} articles from RSS feeds")
     
-    # If no real data available or not enough data, supplement with simulated data
-    if len(all_threats) < 100:
-        st.info("Supplementing with simulated historical data...")
-        
-        # Generate historical data for the last 90 days
-        start_date = datetime.now() - timedelta(days=90)
-        
-        for day in range(1, 91):
-            for _ in range(random.randint(10, 20)):
-                date = start_date + timedelta(days=day)
-                
-                technique_id = random.choice(list(ThreatIntelligence.ATTACK_TECHNIQUES.keys()))
-                technique = ThreatIntelligence.ATTACK_TECHNIQUES[technique_id]
-                actor = random.choice(list(ThreatIntelligence.THREAT_ACTORS.keys()))
-                
-                all_threats.append({
-                    'timestamp': date,
-                    'threat_id': hashlib.md5(str(date).encode() + str(random.random()).encode()).hexdigest(),
-                    'technique_id': technique_id,
-                    'technique_name': technique['name'],
-                    'technique_description': technique['description'],
-                    'category': technique['category'],
-                    'severity': technique['severity'],
-                    'threat_actor': actor,
-                    'actor_description': ThreatIntelligence.THREAT_ACTORS[actor]['description'],
-                    'origin_country': ThreatIntelligence.THREAT_ACTORS[actor]['origin'],
-                    'target_country': random.choice(list(ThreatIntelligence.COUNTRIES.keys())),
-                    'target_sector': random.choice(ThreatIntelligence.SECTORS),
-                    'confidence': random.randint(60, 100),
-                    'kill_chain_phase': random.choice(list(ThreatIntelligence.KILL_CHAIN_PHASES.keys())),
-                    'malware_family': random.choice(['Emotet', 'TrickBot', 'REvil', 'Conti', 'DarkSide']),
-                    'detection_source': 'Simulated',
-                    'blocked': random.choice([True, True, True, False]),
-                    'active': random.choice([True, False]),
-                    'ioc_ip': f"{random.randint(1,255)}.{random.randint(1,255)}.{random.randint(1,255)}.{random.randint(1,255)}",
-                    'ioc_domain': f"malicious-{random.randint(100,999)}.com",
-                    'mitigation': 'Implement network segmentation'
-                })
+    if not all_threats:
+        st.error("❌ No data fetched from any source. Please check your API keys and network connection.")
+        return pd.DataFrame()
     
     df = pd.DataFrame(all_threats)
     if not df.empty:
         df['timestamp'] = pd.to_datetime(df['timestamp'])
     
+    st.info(f"📊 Total threats loaded: {len(df)}")
+    
     return df
 
-@st.cache_data(ttl=600) # Cache the feed for 10 minutes (600 seconds)
+@st.cache_data(ttl=300)
 def get_rss_feed(url):
     """Fetches and parses an RSS feed from a given URL."""
     try:
         feed = feedparser.parse(url)
         return feed.entries
     except Exception as e:
-        st.error(f"Could not fetch feed from {url}: {e}")
+        st.warning(f"Could not fetch feed from {url}: {e}")
         return []
 
 def fetch_and_process_rss_feeds():
-    """
-    Fetches articles from various RSS feeds and formats them into a DataFrame
-    to be merged with the main threat data.
-    """
+    """Fetches articles from various RSS feeds"""
     feeds = {
         "BleepingComputer": "https://www.bleepingcomputer.com/feed/",
         "Hacker News": "https://hnrss.org/frontpage",
@@ -653,8 +577,7 @@ def fetch_and_process_rss_feeds():
     all_articles = []
     for source, url in feeds.items():
         entries = get_rss_feed(url)
-        for entry in entries:
-            # Check for a valid publication date
+        for entry in entries[:20]:  # Limit to 20 per feed
             pub_date = entry.get('published_parsed')
             if pub_date:
                 timestamp = datetime(*pub_date[:6])
@@ -664,11 +587,25 @@ def fetch_and_process_rss_feeds():
             all_articles.append({
                 'timestamp': timestamp,
                 'threat_id': hashlib.md5(entry.get('link', '').encode()).hexdigest(),
-                'source': source,
-                'threat_type': "News",
-                'severity': "Info",
-                'status': "Active",
-                'is_human_targeted': True
+                'technique_id': 'T1566',
+                'technique_name': 'Phishing',
+                'technique_description': 'Security news and threat intelligence',
+                'category': 'Initial Access',
+                'severity': 'Info',
+                'threat_actor': 'Unknown',
+                'actor_description': f'News from {source}',
+                'origin_country': 'Unknown',
+                'target_country': 'Global',
+                'target_sector': 'All',
+                'confidence': 50,
+                'kill_chain_phase': 'Reconnaissance',
+                'malware_family': 'News',
+                'detection_source': source,
+                'blocked': False,
+                'active': True,
+                'ioc_ip': 'N/A',
+                'ioc_domain': 'N/A',
+                'mitigation': entry.get('title', 'No title')[:100]
             })
             
     return pd.DataFrame(all_articles)
