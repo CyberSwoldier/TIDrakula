@@ -1495,15 +1495,24 @@ def main():
                     
                     st.markdown("#### THREAT DETAILS")
                     
-                    display_data = country_threats[['timestamp', 'technique_name', 'technique_description', 
-                                                   'severity', 'threat_actor', 'target_sector', 
-                                                   'blocked', 'active', 'confidence']].copy()
-                    display_data['Status'] = display_data.apply(
-                        lambda x: 'Blocked' if x['blocked'] else 'Active', axis=1
+                    # Add IOC type detection for display
+                    display_data = country_threats.copy()
+                    
+                    # Add IOC column with type detection
+                    display_data['IOC'] = display_data.apply(
+                        lambda x: detect_ioc_type(x['ioc_ip'], x['ioc_domain']), axis=1
                     )
-                    display_data = display_data.drop(['blocked', 'active'], axis=1)
+                    
+                    display_data['Status'] = display_data.apply(
+                        lambda x: 'Blocked' if x['blocked'] else 'Active Threat', axis=1
+                    )
+                    
+                    display_data = display_data[['timestamp', 'technique_name', 'technique_description', 
+                                                'severity', 'threat_actor', 'target_sector', 
+                                                'IOC', 'confidence', 'Status']].copy()
+                    
                     display_data.columns = ['Timestamp', 'Attack Type', 'Description', 'Severity', 
-                                           'Threat Actor', 'Target Sector', 'Confidence %', 'Status']
+                                           'Threat Actor', 'Target Sector', 'IOC', 'Confidence %', 'Status']
                     
                     st.dataframe(
                         display_data.head(50),
