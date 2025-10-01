@@ -571,13 +571,12 @@ def generate_data():
             all_threats.extend(otx_threats)
             st.success(f"✓ Fetched {len(otx_threats)} threats from OTX")
     
-    # Fetch from Shodan if API key available
     if USE_REAL_DATA and SHODAN_API_KEY:
-        with st.spinner("Fetching vulnerability data from Shodan..."):
-            shodan_matches = ShodanDataFetcher.fetch_vulnerabilities(SHODAN_API_KEY, query="vuln", limit=50)
-            shodan_threats = ShodanDataFetcher.parse_shodan_data(shodan_matches)
-            all_threats.extend(shodan_threats)
-            st.success(f"✓ Fetched {len(shodan_threats)} vulnerabilities from Shodan")
+        with st.spinner("Fetching blacklisted IPs from AbuseIPDB..."):
+            abuseipdb_blacklist = AbuseIPDBDataFetcher.fetch_blacklist(SHODAN_API_KEY, confidence_minimum=75, limit=100)
+            abuseipdb_threats = AbuseIPDBDataFetcher.parse_abuseipdb_data(abuseipdb_blacklist)
+            all_threats.extend(abuseipdb_threats)
+            st.success(f"✓ Fetched {len(abuseipdb_threats)} threats from AbuseIPDB")
     
     # Add RSS feed data
     df_rss = fetch_and_process_rss_feeds()
