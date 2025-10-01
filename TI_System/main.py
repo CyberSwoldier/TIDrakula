@@ -582,11 +582,7 @@ def generate_data():
     if not df_rss.empty:
         rss_threats = df_rss.to_dict('records')
         all_threats.extend(rss_threats)
-    
-    # If no real data available or not enough data, supplement with simulated data
-    if len(all_threats) < 100:
-        st.info("Supplementing with simulated historical data...")
-        
+       
     
     df = pd.DataFrame(all_threats)
     if not df.empty:
