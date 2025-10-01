@@ -27,16 +27,15 @@ from sklearn.cluster import KMeans
 import warnings
 warnings.filterwarnings('ignore')
 
-# API Configuration
 try:
-    OTX_API_KEY=st.secrets["OTX_API_KEY"]
-    SHODAN_API_KEY=st.secrets["SHODAN_API_KEY"]
-    USE_REAL_DATA=True
+    OTX_API_KEY = st.secrets["OTX_API_KEY"]
+    SHODAN_API_KEY = st.secrets["SHODAN_API_KEY"]  # Actually contains AbuseIPDB key
+    USE_REAL_DATA = True
 except:
     st.warning("API keys not found in secrets. Using simulated data.")
-    OTX_API_KEY=None
-    SHODAN_API_KEY=None
-    USE_REAL_DATA=False
+    OTX_API_KEY = None
+    SHODAN_API_KEY = None
+    USE_REAL_DATA = False
 
 # Page configuration
 st.set_page_config(
